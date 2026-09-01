@@ -1,0 +1,193 @@
+{
+  "id": "b9738355-6491-49fd-b6ed-619714b93431",
+  "title": "Test Course 1",
+  "units": [
+    {
+      "id": "09e9748b-a09c-408e-9b64-50e39fd88101",
+      "title": "Unit 1: Testing Single Units in Test Course 1",
+      "lessons": [
+        {
+          "id": "da9ffee5-d363-4dc3-9172-4f4d41684011",
+          "title": "Lesson 1.1: Testing Single Lessons",
+          "writtenLesson": {
+            "id": "0fdba862-2c9d-4c60-81ee-d923244924d5",
+            "title": "Lesson 1.1 Overview",
+            "markdown": "# Lesson 1.1: Testing Single Lessons\n### This is a test\nIn this lesson, we're testing this course builder's ability to handle a single lesson contained within a unit of a course.```code console.log('Hello World') ```"
+          },
+          "codePractices": [
+            {
+              "type": "function",
+              "id": "83aaa80f-f8f9-4d2c-a546-5603ed0beff0",
+              "title": "Hello World",
+              "functionSignature": "helloWorld()",
+              "description": "Complete the function `helloWorld()` so that it returns the following string: 'Hello, World!'",
+              "testSuite": [
+                {
+                  "input": [],
+                  "expectedOutput": "Hello, World!"
+                }
+              ]
+            }
+          ],
+          "interactivePractices": []
+        },
+        {
+          "id": "a93cb9a3-2009-464f-a511-730248285163",
+          "title": "Lesson 1.2: Testing Multiple Lessons",
+          "writtenLesson": {
+            "id": "8d855a04-eb1c-4238-991f-7f3752ae046b",
+            "title": "Lesson 1.2: Testing Multiple Lessons",
+            "markdown": "# Lesson 1.2: Testing Multiple Lessons\n### This is a test\nIn this lesson, we're testing this course builder's ability to handle multiple lessons contained within a unit of a course.```code console.log('Hello World') ```"
+          },
+          "codePractices": [
+            {
+              "type": "function",
+              "id": "009c6a4e-7acb-48d2-afed-3795b25b1407",
+              "title": "Hello, John",
+              "functionSignature": "helloName(name: str)",
+              "description": "Complete the function `helloName()` so that it returns the following string: 'Hello, {name}!'",
+              "testSuite": [
+                {
+                  "input": ["John"],
+                  "expectedOutput": "Hello, John!"
+                },
+                {
+                  "input": ["Oscar"],
+                  "expectedOutput": "Hello, Oscar!"
+                }
+              ]
+            }
+          ],
+          "interactivePractices": [
+            {
+              "id": "efa1c505-6338-4634-b5d7-5d1b85f893df",
+              "title": "Lesson 2.1 Interactive Practice",
+              "activities": [
+                {
+                  "type": "matching",
+                  "id": "b234d92a-5474-440a-9173-3c3ca36b6175",
+                  "description": "Match the HTTP status code to the message",
+                  "pairs": [
+                    { "term": "200", "definition": "OK" },
+                    { "term": "201", "definition": "Created" },
+                    { "term": "204", "definition": "No Content" },
+                    { "term": "400", "definition": "Bad Request" },
+                    { "term": "401", "definition": "Unauthorized" },
+                    { "term": "403", "definition": "Forbidden" },
+                    { "term": "404", "definition": "Not Found" },
+                    { "term": "500", "definition": "Internal Server Error" }
+                  ]
+                },
+                {
+                  "type": "fillBlank",
+                  "id": "e029b974-05e6-45bd-8be4-73f980cb8a0c",
+                  "description": "Jessica asks Anna if there's a strongly typed language that compiles into JavaScript.",
+                  "text": "Anna: 'Yes, it's called {{blank}}'",
+                  "blanks": [
+                    {
+                      "position": 0,
+                      "accepted": [
+                        "TypeScript",
+                        "typescript",
+                        "typeScript",
+                        "Typescript"
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "multipleChoice",
+                  "id": "65f87757-36bc-4033-8adb-ad52eca375f3",
+                  "question": "Is React a client-side or server-side framework?",
+                  "options": ["Server-Side", "Client-Side"],
+                  "correctIndex": 1
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "e7ccef98-eddb-45df-8b80-f66139f29fce",
+      "title": "Unit 2: Testing Multiple Units in Test Course 1",
+      "lessons": [
+        {
+          "id": "de7ca329-57b5-4cde-814b-3977bf2ab40b",
+          "title": "Lesson 2.1: Testing Single Lessons (again)",
+          "writtenLesson": {
+            "id": "ad53c863-1b60-4392-a3f5-e66f8ef25915",
+            "title": "Lesson 2.1: Testing Single Lessons (again)",
+            "markdown": "# Lesson 1.1: Testing Single Lessons\n### This is a test\nIn this lesson, we're testing this course builder's ability to handle a single lesson contained within a unit of a course.```code console.log('Hello World') ```"
+          },
+          "codePractices": [
+            {
+              "type": "function",
+              "id": "15775cda-a3d3-4173-8291-18c7eee05869",
+              "title": "Hello, John",
+              "functionSignature": "helloName(name: str)",
+              "description": "Complete the function `helloName()` so that it returns the following string: 'Hello, {name}!'",
+              "testSuite": [
+                {
+                  "input": ["John"],
+                  "expectedOutput": "Hello, John!"
+                },
+                {
+                  "input": ["Oscar"],
+                  "expectedOutput": "Hello, Oscar!"
+                }
+              ]
+            }
+          ],
+          "interactivePractices": [
+            {
+              "id": "f6468eb8-3633-4e4a-b40a-70770ea18da3",
+              "title": "Lesson 2.1 Interactive Practice",
+              "activities": [
+                {
+                  "type": "matching",
+                  "id": "8278524a-6c58-46dc-aa7c-fc01cfd2126b",
+                  "description": "Match the HTTP status code to the message",
+                  "pairs": [
+                    { "term": "200", "definition": "OK" },
+                    { "term": "201", "definition": "Created" },
+                    { "term": "204", "definition": "No Content" },
+                    { "term": "400", "definition": "Bad Request" },
+                    { "term": "401", "definition": "Unauthorized" },
+                    { "term": "403", "definition": "Forbidden" },
+                    { "term": "404", "definition": "Not Found" },
+                    { "term": "500", "definition": "Internal Server Error" }
+                  ]
+                },
+                {
+                  "type": "fillBlank",
+                  "id": "05ad9f26-46a1-43c8-aa09-5387feff95c5",
+                  "description": "Jessica asks Anna if there's a strongly typed language that compiles into JavaScript.",
+                  "text": "Anna: 'Yes, it's called {{blank}}'",
+                  "blanks": [
+                    {
+                      "position": 0,
+                      "accepted": [
+                        "TypeScript",
+                        "typescript",
+                        "typeScript",
+                        "Typescript"
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "multipleChoice",
+                  "id": "96805d2d-9233-4e64-b024-fb1318b189ee",
+                  "question": "Is React a client-side or server-side framework?",
+                  "options": ["Server-Side", "Client-Side"],
+                  "correctIndex": 1
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
