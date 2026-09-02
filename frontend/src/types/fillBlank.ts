@@ -1,4 +1,4 @@
-interface Blank {
+export interface Blank {
   position: number
   accepted: string[]
 }

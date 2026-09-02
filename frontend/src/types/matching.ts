@@ -1,4 +1,5 @@
 interface Pair {
+  id: string,
   term: string
   definition: string
 }
