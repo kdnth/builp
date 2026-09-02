@@ -16,7 +16,8 @@
     "@mantine/hooks": "^9.6.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "react-router-dom": "^7.18.3"
+    "react-router-dom": "^7.18.3",
+    "zod": "^4.5.4"
   },
   "devDependencies": {
     "@phosphor-icons/react": "^2.1.10",

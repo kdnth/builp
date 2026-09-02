@@ -12,7 +12,8 @@ import {
 } from '@mantine/core'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { CheckCircleIcon, CircleIcon, LockIcon } from '@phosphor-icons/react'
-import { getCourse } from '../../data/courses'
+import { useCourses } from '../../hooks/useCourses'
+import { findCourse } from '../../helpers/findCourse'
 import { useCourseProgress } from '../../hooks/useCourseProgress'
 import {
   countCompletedLessons,
@@ -24,7 +25,8 @@ import {
 
 export default function CourseTreePage() {
   const { courseId } = useParams<{ courseId: string }>()
-  const course = courseId ? getCourse(courseId) : undefined
+  const { courses } = useCourses()
+  const course = courseId ? findCourse(courses, courseId) : undefined
   const { completedLessonIds } = useCourseProgress(courseId ?? '')
 
   if (!course) {
@@ -53,41 +55,52 @@ export default function CourseTreePage() {
 
         <Stack gap="sm">
           {course.units.map((unit, unitIndex) => {
-            const unlocked = isUnitUnlocked(completedLessonIds, course, unitIndex)
+            const unlocked = isUnitUnlocked(
+              completedLessonIds,
+              course,
+              unitIndex,
+            )
             const complete = isUnitComplete(completedLessonIds, unit)
             const completedInUnit = unit.lessons.filter((lesson) =>
               isLessonComplete(completedLessonIds, lesson.id),
             ).length
 
+            const label = unit.title
+            const description = unlocked
+              ? `${completedInUnit}/${unit.lessons.length} lessons complete`
+              : 'Complete prerequisites to start unit'
+            const leftSection = complete ? (
+              <CheckCircleIcon
+                size={20}
+                color="var(--mantine-color-green-6)"
+                weight="fill"
+              />
+            ) : unlocked ? (
+              <CircleIcon size={20} />
+            ) : (
+              <LockIcon size={20} />
+            )
+
             return (
               <Card key={unit.id} withBorder radius="md" p={0}>
-                <NavLink
-                  component={unlocked ? Link : 'div'}
-                  to={
-                    unlocked ? `/courses/${course.id}/units/${unit.id}` : undefined
-                  }
-                  disabled={!unlocked}
-                  variant="filled"
-                  label={unit.title}
-                  description={
-                    unlocked
-                      ? `${completedInUnit}/${unit.lessons.length} lessons complete`
-                      : 'Locked — complete the previous unit first'
-                  }
-                  leftSection={
-                    complete ? (
-                      <CheckCircleIcon
-                        size={20}
-                        color="var(--mantine-color-green-6)"
-                        weight="fill"
-                      />
-                    ) : unlocked ? (
-                      <CircleIcon size={20} />
-                    ) : (
-                      <LockIcon size={20} />
-                    )
-                  }
-                />
+                {unlocked ? (
+                  <NavLink
+                    component={Link}
+                    to={`/courses/${course.id}/units/${unit.id}`}
+                    variant="filled"
+                    label={label}
+                    description={description}
+                    leftSection={leftSection}
+                  />
+                ) : (
+                  <NavLink
+                    disabled
+                    variant="filled"
+                    label={label}
+                    description={description}
+                    leftSection={leftSection}
+                  />
+                )}
                 <Stack gap={4} pl={54} pr="md" pb="sm">
                   {unit.lessons.map((lesson) => {
                     const lessonComplete = isLessonComplete(

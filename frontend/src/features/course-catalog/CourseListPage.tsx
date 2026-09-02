@@ -1,4 +1,5 @@
 import {
+  Button,
   Card,
   Container,
   Group,
@@ -9,12 +10,13 @@ import {
   Title,
 } from '@mantine/core'
 import { Link } from 'react-router-dom'
-import { GraduationCapIcon } from '@phosphor-icons/react'
-import { courses } from '../../data/courses'
+import { GraduationCapIcon, UploadIcon } from '@phosphor-icons/react'
+import type { Course } from '../../types/course'
+import { useCourses } from '../../hooks/useCourses'
 import { useCourseProgress } from '../../hooks/useCourseProgress'
 import { countCompletedLessons, countTotalLessons } from '../../helpers/progress'
 
-function CourseCard({ course }: { course: (typeof courses)[number] }) {
+function CourseCard({ course }: { course: Course }) {
   const { completedLessonIds } = useCourseProgress(course.id)
   const completed = countCompletedLessons(completedLessonIds, course)
   const total = countTotalLessons(course)
@@ -50,10 +52,21 @@ function CourseCard({ course }: { course: (typeof courses)[number] }) {
 }
 
 export default function CourseListPage() {
+  const { courses } = useCourses()
+
   return (
     <Container size="lg" py="xl">
       <Stack gap="lg">
-        <Title order={1}>Courses</Title>
+        <Group justify="space-between" align="center">
+          <Title order={1}>Courses</Title>
+          <Button
+            component={Link}
+            to="/courses/new"
+            leftSection={<UploadIcon size={16} />}
+          >
+            Upload Course
+          </Button>
+        </Group>
         <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }}>
           {courses.map((course) => (
             <CourseCard key={course.id} course={course} />

@@ -1,12 +1,14 @@
 import { Navigate, useParams } from 'react-router-dom'
-import { getCourse } from '../../data/courses'
+import { useCourses } from '../../hooks/useCourses'
+import { findCourse } from '../../helpers/findCourse'
 import { useCourseProgress } from '../../hooks/useCourseProgress'
 import { isUnitUnlocked } from '../../helpers/progress'
 import UnitComponent from './UnitComponent'
 
 export default function UnitPage() {
   const { courseId, unitId } = useParams<{ courseId: string; unitId: string }>()
-  const course = courseId ? getCourse(courseId) : undefined
+  const { courses } = useCourses()
+  const course = courseId ? findCourse(courses, courseId) : undefined
   const { completedLessonIds, markLessonComplete } = useCourseProgress(
     courseId ?? '',
   )

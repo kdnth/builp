@@ -149,14 +149,14 @@
                   "id": "8278524a-6c58-46dc-aa7c-fc01cfd2126b",
                   "description": "Match the HTTP status code to the message",
                   "pairs": [
-                    { "term": "200", "definition": "OK" },
-                    { "term": "201", "definition": "Created" },
-                    { "term": "204", "definition": "No Content" },
-                    { "term": "400", "definition": "Bad Request" },
-                    { "term": "401", "definition": "Unauthorized" },
-                    { "term": "403", "definition": "Forbidden" },
-                    { "term": "404", "definition": "Not Found" },
-                    { "term": "500", "definition": "Internal Server Error" }
+                    { "id": "1", "term": "200", "definition": "OK" },
+                    { "id": "2", "term": "201", "definition": "Created" },
+                    { "id": "3", "term": "204", "definition": "No Content" },
+                    { "id": "4", "term": "400", "definition": "Bad Request" },
+                    { "id": "5", "term": "401", "definition": "Unauthorized" },
+                    { "id": "6", "term": "403", "definition": "Forbidden" },
+                    { "id": "7", "term": "404", "definition": "Not Found" },
+                    { "id": "8", "term": "500", "definition": "Internal Server Error" }
                   ]
                 },
                 {
