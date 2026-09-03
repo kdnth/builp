@@ -9,6 +9,7 @@ import {
   FileInput,
   Group,
   List,
+  Paper,
   Stack,
   Text,
   Title,
@@ -16,13 +17,13 @@ import {
 import { useDisclosure } from '@mantine/hooks'
 import { BracketsCurlyIcon, UploadIcon, WarningCircleIcon } from '@phosphor-icons/react'
 import { courseSchema } from '../../schemas/course'
-import { useCourses } from '../../hooks/useCourses'
-import { findCourse } from '../../helpers/findCourse'
+import { ApiError, createCourseOnApi } from '../../lib/api'
+import { useAuthSession } from '../../lib/auth'
 import CourseSchemaModal from './CourseSchemaModal'
 
 export default function UploadCoursePage() {
   const navigate = useNavigate()
-  const { courses, addCourse } = useCourses()
+  const session = useAuthSession()
   const [fileName, setFileName] = useState<string | null>(null)
   const [issues, setIssues] = useState<string[] | null>(null)
   const [schemaOpened, { open: openSchema, close: closeSchema }] =
@@ -61,15 +62,33 @@ export default function UploadCoursePage() {
       return
     }
 
-    if (findCourse(courses, result.data.id)) {
+    try {
+      const created = await createCourseOnApi(result.data)
+      navigate(`/courses/${created.id}`)
+    } catch (err) {
       setIssues([
-        `A course with id "${result.data.id}" already exists. Change the "id" field and try again.`,
+        err instanceof ApiError ? err.message : 'Could not upload this course.',
       ])
-      return
     }
+  }
 
-    addCourse(result.data)
-    navigate(`/courses/${result.data.id}`)
+  if (!session.isPending && !session.data) {
+    return (
+      <Container size="xs" py="xl">
+        <Paper withBorder radius="md" p="lg">
+          <Stack gap="md">
+            <Title order={2}>Upload Course</Title>
+            <Text c="dimmed" size="sm">
+              Sign in to upload a course. Uploaded courses are attributed to
+              you and visible to everyone.
+            </Text>
+            <Button component={Link} to="/sign-in">
+              Sign in
+            </Button>
+          </Stack>
+        </Paper>
+      </Container>
+    )
   }
 
   return (
@@ -81,7 +100,8 @@ export default function UploadCoursePage() {
           </Anchor>
           <Title order={1}>Upload Course</Title>
           <Text c="dimmed" size="sm">
-            Upload a course JSON file.
+            Upload a course JSON file. It's attributed to you and visible to
+            everyone.
           </Text>
         </Stack>
 

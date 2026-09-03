@@ -1,5 +1,5 @@
 import { Alert } from '@mantine/core'
-import { CheckCircleIcon, XCircleIcon } from '@phosphor-icons/react'
+import { CheckCircleIcon, InfoIcon, XCircleIcon } from '@phosphor-icons/react'
 import type { ActivityStatus } from '../../types/activityStatus'
 
 interface ActivityAlertProps {
@@ -10,14 +10,19 @@ interface ActivityAlertProps {
 export default function ActivityAlert({ status, message }: ActivityAlertProps) {
   if (status === null || message === null) return null
 
-  const isCorrect = status === 'correct'
+  const color =
+    status === 'correct' ? 'green' : status === 'revealed' ? 'yellow' : 'red'
+  const icon =
+    status === 'correct' ? (
+      <CheckCircleIcon weight="fill" />
+    ) : status === 'revealed' ? (
+      <InfoIcon weight="fill" />
+    ) : (
+      <XCircleIcon weight="fill" />
+    )
 
   return (
-    <Alert
-      color={isCorrect ? 'green' : 'red'}
-      icon={isCorrect ? <CheckCircleIcon weight="fill" /> : <XCircleIcon weight="fill" />}
-      radius="md"
-    >
+    <Alert color={color} icon={icon} radius="md">
       {message}
     </Alert>
   )

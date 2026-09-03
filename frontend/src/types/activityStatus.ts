@@ -1,1 +1,1 @@
-export type ActivityStatus = 'correct' | 'incorrect' | null
+export type ActivityStatus = 'correct' | 'incorrect' | 'revealed' | null

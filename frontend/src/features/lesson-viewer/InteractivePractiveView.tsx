@@ -1,14 +1,16 @@
 import { Alert, Badge, Group, Paper, Stack, Text, Title } from '@mantine/core'
 import { CheckCircleIcon } from '@phosphor-icons/react'
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { InteractivePractice } from '../../types/interactivePractice'
 import ActivityComponentRenderer from './ActivityComponentRenderer'
 
 interface InteractivePracticeViewProps {
   view: InteractivePractice
+  onAllActivitiesComplete?: (practiceId: string, allComplete: boolean) => void
 }
 export default function InteractivePracticeView({
   view,
+  onAllActivitiesComplete,
 }: InteractivePracticeViewProps) {
   const [completed, setCompleted] = useState<Record<string, boolean>>({})
 
@@ -26,6 +28,11 @@ export default function InteractivePracticeView({
   const total = view.activities.length
   const completedCount = Object.values(completed).filter(Boolean).length
   const allComplete = total > 0 && completedCount === total
+  const readyToProceed = total === 0 || completedCount === total
+
+  useEffect(() => {
+    onAllActivitiesComplete?.(view.id, readyToProceed)
+  }, [readyToProceed, view.id, onAllActivitiesComplete])
 
   return (
     <Paper withBorder radius="md" p="lg" shadow="sm">

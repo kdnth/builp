@@ -1,20 +1,26 @@
+import { useState } from 'react'
 import {
   Anchor,
   Badge,
+  Button,
   Card,
+  Center,
   Group,
   Container,
+  Loader,
   NavLink,
   Progress,
   Stack,
   Text,
+  TagsInput,
   Title,
 } from '@mantine/core'
 import { Link, Navigate, useParams } from 'react-router-dom'
-import { CheckCircleIcon, CircleIcon, LockIcon } from '@phosphor-icons/react'
-import { useCourses } from '../../hooks/useCourses'
-import { findCourse } from '../../helpers/findCourse'
+import { CheckCircleIcon, CircleIcon, LockIcon, TagIcon } from '@phosphor-icons/react'
+import { useCourse } from '../../hooks/useCourse'
 import { useCourseProgress } from '../../hooks/useCourseProgress'
+import { useAuthSession } from '../../lib/auth'
+import { updateCourseTags } from '../../lib/api'
 import {
   countCompletedLessons,
   countTotalLessons,
@@ -23,15 +29,68 @@ import {
   isUnitUnlocked,
 } from '../../helpers/progress'
 
+function TagEditor({
+  courseId,
+  tags,
+  onSaved,
+}: {
+  courseId: string
+  tags: string[]
+  onSaved: (tags: string[]) => void
+}) {
+  const [draft, setDraft] = useState(tags)
+  const [saving, setSaving] = useState(false)
+  const dirty = JSON.stringify([...draft].sort()) !== JSON.stringify([...tags].sort())
+
+  async function handleSave() {
+    setSaving(true)
+    try {
+      const result = await updateCourseTags(courseId, draft)
+      onSaved(result.tags)
+      setDraft(result.tags)
+    } catch {
+      // leave the draft as-is so the user can retry
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Group align="flex-end" gap="xs">
+      <TagsInput
+        label="Tags"
+        placeholder="Add a tag"
+        value={draft}
+        onChange={setDraft}
+        style={{ flex: 1 }}
+        leftSection={<TagIcon size={16} />}
+      />
+      <Button size="sm" disabled={!dirty} loading={saving} onClick={handleSave}>
+        Save
+      </Button>
+    </Group>
+  )
+}
+
 export default function CourseTreePage() {
   const { courseId } = useParams<{ courseId: string }>()
-  const { courses } = useCourses()
-  const course = courseId ? findCourse(courses, courseId) : undefined
+  const { course, setCourse, loading, notFound } = useCourse(courseId)
+  const session = useAuthSession()
   const { completedLessonIds } = useCourseProgress(courseId ?? '')
 
-  if (!course) {
+  if (notFound) {
     return <Navigate to="/" replace />
   }
+
+  if (loading || !course) {
+    return (
+      <Center py={80}>
+        <Loader />
+      </Center>
+    )
+  }
+
+  const isOwner = session.data?.user.id === course.owner_user_id
 
   const completed = countCompletedLessons(completedLessonIds, course)
   const total = countTotalLessons(course)
@@ -53,13 +112,25 @@ export default function CourseTreePage() {
           <Progress value={percent} radius="xl" />
         </Stack>
 
+        {isOwner ? (
+          <TagEditor
+            courseId={course.id}
+            tags={course.tags}
+            onSaved={(tags) => setCourse({ ...course, tags })}
+          />
+        ) : course.tags.length > 0 ? (
+          <Group gap="xs">
+            {course.tags.map((tag) => (
+              <Badge key={tag} variant="light" color="gray">
+                {tag}
+              </Badge>
+            ))}
+          </Group>
+        ) : null}
+
         <Stack gap="sm">
           {course.units.map((unit, unitIndex) => {
-            const unlocked = isUnitUnlocked(
-              completedLessonIds,
-              course,
-              unitIndex,
-            )
+            const unlocked = isUnitUnlocked(completedLessonIds, course, unitIndex)
             const complete = isUnitComplete(completedLessonIds, unit)
             const completedInUnit = unit.lessons.filter((lesson) =>
               isLessonComplete(completedLessonIds, lesson.id),

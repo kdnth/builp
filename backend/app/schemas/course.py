@@ -140,13 +140,33 @@ class CourseSummary(BaseModel):
     title: str
     unit_count: int
     lesson_count: int
+    tags: list[str] = []
+    owner_user_id: str | None = None
 
 
-def summarize(course: Course) -> CourseSummary:
+class CourseDetail(Course):
+    """Course content plus the DB-side metadata that was never part of the
+    JSON contract: tags and authorship. Kept separate from Course itself so
+    the upload/generation path (which only ever produces course content)
+    doesn't need to know these fields exist."""
+
+    tags: list[str] = []
+    owner_user_id: str | None = None
+
+
+class UpdateTagsRequest(BaseModel):
+    tags: list[str]
+
+
+def summarize(
+    course: Course, *, tags: list[str], owner_user_id: str | None
+) -> CourseSummary:
     lesson_count = sum(len(unit.lessons) for unit in course.units)
     return CourseSummary(
         id=course.id,
         title=course.title,
         unit_count=len(course.units),
         lesson_count=lesson_count,
+        tags=tags,
+        owner_user_id=owner_user_id,
     )

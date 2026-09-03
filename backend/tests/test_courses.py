@@ -16,12 +16,16 @@ def test_create_and_fetch_course(client, sample_course):
             "title": "Test Course",
             "unit_count": 1,
             "lesson_count": 1,
+            "tags": [],
+            "owner_user_id": "user-1",
         }
     ]
 
     fetched = client.get("/api/courses/test-course")
     assert fetched.status_code == 200
     assert fetched.json()["title"] == "Test Course"
+    assert fetched.json()["tags"] == []
+    assert fetched.json()["owner_user_id"] == "user-1"
 
 
 def test_create_course_rejects_missing_field(client, sample_course):
@@ -75,3 +79,82 @@ def test_create_course_without_auth_is_rejected(client, sample_course):
 
     assert response.status_code == 503
     assert client.get("/api/courses").json() == []
+
+
+def test_search_matches_title_case_insensitively(client, sample_course):
+    client.post("/api/courses", json=sample_course)
+
+    assert len(client.get("/api/courses?q=test").json()) == 1
+    assert len(client.get("/api/courses?q=TEST").json()) == 1
+    assert len(client.get("/api/courses?q=nomatch").json()) == 0
+
+
+def test_update_tags_by_owner(client, sample_course):
+    client.post("/api/courses", json=sample_course)
+
+    response = client.patch(
+        "/api/courses/test-course/tags", json={"tags": ["python", "beginner"]}
+    )
+    assert response.status_code == 200
+    assert response.json()["tags"] == ["beginner", "python"]
+
+    fetched = client.get("/api/courses/test-course").json()
+    assert fetched["tags"] == ["beginner", "python"]
+
+
+def test_update_tags_dedupes_and_strips_blanks(client, sample_course):
+    client.post("/api/courses", json=sample_course)
+
+    response = client.patch(
+        "/api/courses/test-course/tags",
+        json={"tags": ["python", "python", "  ", "beginner", " beginner "]},
+    )
+    assert response.json()["tags"] == ["beginner", "python"]
+
+
+def test_update_tags_rejected_for_non_owner(client, sample_course):
+    from app.auth import AuthenticatedUser, get_current_user
+    from app.main import app
+
+    client.post("/api/courses", json=sample_course)
+
+    app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(id="user-2")
+    try:
+        response = client.patch(
+            "/api/courses/test-course/tags", json={"tags": ["python"]}
+        )
+    finally:
+        app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(
+            id="user-1"
+        )
+
+    assert response.status_code == 403
+    assert client.get("/api/courses/test-course").json()["tags"] == []
+
+
+def test_update_tags_missing_course_is_404(client):
+    response = client.patch(
+        "/api/courses/does-not-exist/tags", json={"tags": ["python"]}
+    )
+    assert response.status_code == 404
+
+
+def test_filter_by_tag(client, sample_course):
+    import copy
+
+    course_a = sample_course
+    course_b = copy.deepcopy(sample_course)
+    course_b["id"] = "test-course-b"
+
+    client.post("/api/courses", json=course_a)
+    client.post("/api/courses", json=course_b)
+    client.patch("/api/courses/test-course/tags", json={"tags": ["python"]})
+    client.patch("/api/courses/test-course-b/tags", json={"tags": ["javascript"]})
+
+    python_courses = client.get("/api/courses?tag=python").json()
+    assert [c["id"] for c in python_courses] == ["test-course"]
+
+    js_courses = client.get("/api/courses?tag=javascript").json()
+    assert [c["id"] for c in js_courses] == ["test-course-b"]
+
+    assert len(client.get("/api/courses").json()) == 2

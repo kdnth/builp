@@ -1,4 +1,4 @@
-import { Button, Grid, Paper, Stack, Text } from '@mantine/core'
+import { Button, Grid, Group, Paper, Stack, Text } from '@mantine/core'
 import type { Matching } from '../../types/matching'
 import { useEffect, useState } from 'react'
 import { shuffle } from '../../helpers/shuffle'
@@ -43,6 +43,7 @@ export default function MatchingComponent({
   const [matchedPairIds, setMatchedPairIds] = useState<Set<string>>(new Set())
   const [status, setStatus] = useState<ActivityStatus>(null)
   const [message, setMessage] = useState<string | null>(null)
+  const [attempts, setAttempts] = useState(0)
 
   const [termTiles, setTermTiles] = useState<Tile[]>(() =>
     buildTiles(activity.pairs, 'term'),
@@ -51,6 +52,8 @@ export default function MatchingComponent({
     buildTiles(activity.pairs, 'definition'),
   )
 
+  const maxAttempts = 3
+  const revealed = status === 'revealed'
   const isComplete = matchedPairIds.size === activity.pairs.length
 
   useEffect(() => {
@@ -93,6 +96,7 @@ export default function MatchingComponent({
     setSelection(emptyMatch)
     setStatus('incorrect')
     setMessage(pickRandomMessage(failedMessages))
+    setAttempts((prev) => prev + 1)
   }
 
   const handleMatch = (selection: Match) => {
@@ -119,12 +123,21 @@ export default function MatchingComponent({
     }
   }
 
+  function handleShowAnswer() {
+    setMatchedPairIds(new Set(activity.pairs.map((p) => p.id)))
+    setSelection(emptyMatch)
+    setIncorrectSelection(emptyMatch)
+    setStatus('revealed')
+    setMessage("Here's the answer.")
+  }
+
   function handleRedo() {
     setSelection(emptyMatch)
     setIncorrectSelection(emptyMatch)
     setMatchedPairIds(new Set())
     setStatus(null)
     setMessage(null)
+    setAttempts(0)
     setTermTiles(buildTiles(activity.pairs, 'term'))
     setDefinitionTiles(buildTiles(activity.pairs, 'definition'))
   }
@@ -156,7 +169,9 @@ export default function MatchingComponent({
                   }
                   color={
                     matchedPairIds.has(t.id)
-                      ? 'green'
+                      ? revealed
+                        ? 'yellow'
+                        : 'green'
                       : t.id === selection.termId
                         ? 'blue'
                         : t.id === incorrectSelection.termId
@@ -185,7 +200,9 @@ export default function MatchingComponent({
                   }
                   color={
                     matchedPairIds.has(t.id)
-                      ? 'green'
+                      ? revealed
+                        ? 'yellow'
+                        : 'green'
                       : t.id === selection.definitionId
                         ? 'blue'
                         : t.id === incorrectSelection.definitionId
@@ -200,6 +217,13 @@ export default function MatchingComponent({
           </Grid.Col>
         </Grid>
         <ActivityAlert status={status} message={message} />
+        {!isComplete && attempts >= maxAttempts && (
+          <Group gap="xs">
+            <Button variant="outline" color="yellow" onClick={handleShowAnswer}>
+              Show Answer
+            </Button>
+          </Group>
+        )}
       </Stack>
     </Paper>
   )

@@ -1,4 +1,4 @@
-import { Button, Chip, ChipGroup, Paper, Stack, Text } from '@mantine/core'
+import { Button, Chip, ChipGroup, Group, Paper, Stack, Text } from '@mantine/core'
 import type { MultipleChoice } from '../../types/multipleChoice'
 import { useEffect, useState } from 'react'
 import type { ActivityStatus } from '../../types/activityStatus'
@@ -21,12 +21,16 @@ export default function MultipleChoiceComponent({
   const [value, setValue] = useState<string | null>(null)
   const [status, setStatus] = useState<ActivityStatus>(null)
   const [message, setMessage] = useState<string | null>(null)
+  const [attempts, setAttempts] = useState(0)
+
+  const maxAttempts = 3
+  const passed = status === 'correct'
+  const revealed = status === 'revealed'
+  const resolved = passed || revealed
 
   useEffect(() => {
-    onComplete(activity.id, status === 'correct')
-  }, [status, activity.id, onComplete])
-
-  const passed = status === 'correct'
+    onComplete(activity.id, resolved)
+  }, [resolved, activity.id, onComplete])
 
   const handleChipClick = (event: React.MouseEvent<HTMLInputElement>) => {
     setStatus(null)
@@ -41,15 +45,26 @@ export default function MultipleChoiceComponent({
     const isCorrect = value !== null && Number.parseInt(value) === activity.correctIndex
     setStatus(isCorrect ? 'correct' : 'incorrect')
     setMessage(pickRandomMessage(isCorrect ? passedMessages : failedMessages))
+    if (!isCorrect) {
+      setAttempts((prev) => prev + 1)
+    }
+  }
+
+  function handleShowAnswer() {
+    setValue(activity.correctIndex.toString())
+    setStatus('revealed')
+    setMessage(`Here's the answer: ${questionLabels[activity.correctIndex]}. ${activity.options[activity.correctIndex]}`)
   }
 
   function handleRedo() {
     setValue(null)
     setStatus(null)
     setMessage(null)
+    setAttempts(0)
   }
 
-  const chipColor = status === 'incorrect' ? 'red' : passed ? 'green' : undefined
+  const chipColor =
+    status === 'incorrect' ? 'red' : passed ? 'green' : revealed ? 'yellow' : undefined
 
   return (
     <Paper withBorder radius="md" p="lg">
@@ -70,13 +85,13 @@ export default function MultipleChoiceComponent({
                 onClick={handleChipClick}
                 icon={null}
                 color={chipColor}
-                disabled={passed}
+                disabled={resolved}
                 styles={{
-                  label: passed
+                  label: resolved
                     ? {
                         cursor: 'default',
                         backgroundColor: isSelected
-                          ? 'var(--mantine-color-green-filled)'
+                          ? `var(--mantine-color-${passed ? 'green' : 'yellow'}-filled)`
                           : 'transparent',
                         color: isSelected
                           ? 'var(--mantine-color-white)'
@@ -91,23 +106,30 @@ export default function MultipleChoiceComponent({
           })}
         </ChipGroup>
         <ActivityAlert status={status} message={message} />
-        <Button
-          disabled={value === null || passed}
-          onClick={handleSubmit}
-          color={chipColor}
-          styles={{
-            root: passed
-              ? {
-                  cursor: 'default',
-                  backgroundColor: 'var(--mantine-color-green-filled)',
-                  color: 'var(--mantine-color-white)',
-                  border: 'none',
-                }
-              : undefined,
-          }}
-        >
-          {passed ? 'Correct!' : 'Submit'}
-        </Button>
+        <Group gap="xs">
+          <Button
+            disabled={value === null || resolved}
+            onClick={handleSubmit}
+            color={chipColor}
+            styles={{
+              root: resolved
+                ? {
+                    cursor: 'default',
+                    backgroundColor: `var(--mantine-color-${passed ? 'green' : 'yellow'}-filled)`,
+                    color: 'var(--mantine-color-white)',
+                    border: 'none',
+                  }
+                : undefined,
+            }}
+          >
+            {passed ? 'Correct!' : revealed ? 'Answer Revealed' : 'Submit'}
+          </Button>
+          {!resolved && attempts >= maxAttempts && (
+            <Button variant="outline" color="yellow" onClick={handleShowAnswer}>
+              Show Answer
+            </Button>
+          )}
+        </Group>
       </Stack>
     </Paper>
   )

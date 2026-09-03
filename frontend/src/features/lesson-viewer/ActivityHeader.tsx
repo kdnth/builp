@@ -19,7 +19,13 @@ export default function ActivityHeader({
   extra,
 }: ActivityHeaderProps) {
   const color =
-    status === 'correct' ? 'green' : status === 'incorrect' ? 'red' : undefined
+    status === 'correct'
+      ? 'green'
+      : status === 'incorrect'
+        ? 'red'
+        : status === 'revealed'
+          ? 'yellow'
+          : undefined
 
   return (
     <Group justify="between">

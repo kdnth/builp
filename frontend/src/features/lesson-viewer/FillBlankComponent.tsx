@@ -28,12 +28,16 @@ export default function FillBlankComponent({
   const [results, setResults] = useState<boolean[] | null>(null)
   const [status, setStatus] = useState<ActivityStatus>(null)
   const [message, setMessage] = useState<string | null>(null)
+  const [attempts, setAttempts] = useState(0)
+
+  const maxAttempts = 3
+  const passed = status === 'correct'
+  const revealed = status === 'revealed'
+  const resolved = passed || revealed
 
   useEffect(() => {
-    onComplete(activity.id, status === 'correct')
-  }, [status, activity.id, onComplete])
-
-  const passed = status === 'correct'
+    onComplete(activity.id, resolved)
+  }, [resolved, activity.id, onComplete])
 
   function handleChange(idx: number, value: string) {
     const next = [...answers]
@@ -55,6 +59,16 @@ export default function FillBlankComponent({
     setResults(next)
     setStatus(isCorrect ? 'correct' : 'incorrect')
     setMessage(pickRandomMessage(isCorrect ? passedMessages : failedMessages))
+    if (!isCorrect) {
+      setAttempts((prev) => prev + 1)
+    }
+  }
+
+  function handleShowAnswer() {
+    setAnswers(blanks.map((blank) => blank.accepted[0]))
+    setResults(blanks.map(() => true))
+    setStatus('revealed')
+    setMessage("Here's the answer.")
   }
 
   function handleRedo() {
@@ -62,6 +76,7 @@ export default function FillBlankComponent({
     setResults(null)
     setStatus(null)
     setMessage(null)
+    setAttempts(0)
   }
 
   return (
@@ -86,12 +101,14 @@ export default function FillBlankComponent({
                   w={120}
                   value={answers[idx]}
                   onChange={(e) => handleChange(idx, e.currentTarget.value)}
-                  disabled={passed}
+                  disabled={resolved}
                   error={results !== null && !results[idx]}
                   styles={{
                     input:
                       results !== null && results[idx]
-                        ? { borderColor: 'var(--mantine-color-green-filled)' }
+                        ? {
+                            borderColor: `var(--mantine-color-${passed ? 'green' : 'yellow'}-filled)`,
+                          }
                         : undefined,
                   }}
                 />
@@ -100,23 +117,30 @@ export default function FillBlankComponent({
           ))}
         </Group>
         <ActivityAlert status={status} message={message} />
-        <Button
-          disabled={passed || answers.some((a) => a.trim() === '')}
-          onClick={handleSubmit}
-          color={status === 'incorrect' ? 'red' : passed ? 'green' : undefined}
-          styles={{
-            root: passed
-              ? {
-                  cursor: 'default',
-                  backgroundColor: 'var(--mantine-color-green-filled)',
-                  color: 'var(--mantine-color-white)',
-                  border: 'none',
-                }
-              : undefined,
-          }}
-        >
-          {passed ? 'Correct!' : 'Submit'}
-        </Button>
+        <Group gap="xs">
+          <Button
+            disabled={resolved || answers.some((a) => a.trim() === '')}
+            onClick={handleSubmit}
+            color={status === 'incorrect' ? 'red' : passed ? 'green' : undefined}
+            styles={{
+              root: resolved
+                ? {
+                    cursor: 'default',
+                    backgroundColor: `var(--mantine-color-${passed ? 'green' : 'yellow'}-filled)`,
+                    color: 'var(--mantine-color-white)',
+                    border: 'none',
+                  }
+                : undefined,
+            }}
+          >
+            {passed ? 'Correct!' : revealed ? 'Answer Revealed' : 'Submit'}
+          </Button>
+          {!resolved && attempts >= maxAttempts && (
+            <Button variant="outline" color="yellow" onClick={handleShowAnswer}>
+              Show Answer
+            </Button>
+          )}
+        </Group>
       </Stack>
     </Paper>
   )

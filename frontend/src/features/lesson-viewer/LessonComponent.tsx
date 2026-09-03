@@ -1,9 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { Lesson } from '../../types/lesson'
 import { Box, Button, Group, Paper, Stack, Stepper, Title } from '@mantine/core'
 import { ArrowRightIcon } from '@phosphor-icons/react'
 import type { LessonView } from '../../types/lessonView'
-import { isCodePractice, isWrittenLesson } from '../../helpers/typeGuards'
+import {
+  isCodePractice,
+  isInteractivePractice,
+  isWrittenLesson,
+} from '../../helpers/typeGuards'
 import LessonViewRenderer from './LessonViewRenderer'
 import ActivityAlert from './ActivityAlert'
 
@@ -28,10 +32,24 @@ export default function LessonComponent({
   const pageCount =
     1 + lesson.codePractices.length + lesson.interactivePractices.length
   const [active, setActive] = useState(0)
+  const [practiceCompletion, setPracticeCompletion] = useState<
+    Record<string, boolean>
+  >({})
   const nextStep = () =>
     setActive((current) => (current < pageCount ? current + 1 : current))
   const prevStep = () =>
     setActive((current) => (current > 0 ? current - 1 : current))
+
+  const handlePracticeComplete = useCallback(
+    (practiceId: string, allComplete: boolean) => {
+      setPracticeCompletion((prev) =>
+        prev[practiceId] === allComplete
+          ? prev
+          : { ...prev, [practiceId]: allComplete },
+      )
+    },
+    [],
+  )
 
   useEffect(() => {
     if (active === pageCount) {
@@ -44,6 +62,12 @@ export default function LessonComponent({
     ...lesson.codePractices,
     ...lesson.interactivePractices,
   ]
+
+  const currentPage = pages[active]
+  const currentPageReady =
+    currentPage === undefined ||
+    !isInteractivePractice(currentPage) ||
+    practiceCompletion[currentPage.id] === true
 
   function getViewTypeString(view: LessonView) {
     if (isWrittenLesson(view)) {
@@ -66,7 +90,10 @@ export default function LessonComponent({
             description={getViewTypeString(page)}
           >
             <Box mt="md">
-              <LessonViewRenderer view={page} />
+              <LessonViewRenderer
+                view={page}
+                onInteractivePracticeComplete={handlePracticeComplete}
+              />
             </Box>
           </Stepper.Step>
         ))}
@@ -99,8 +126,11 @@ export default function LessonComponent({
         <Button variant="default" onClick={prevStep} disabled={active === 0}>
           Back
         </Button>
-        <Button onClick={nextStep} disabled={active === pageCount}>
-          Next step
+        <Button
+          onClick={nextStep}
+          disabled={active === pageCount || !currentPageReady}
+        >
+          Next
         </Button>
       </Group>
     </Stack>

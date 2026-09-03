@@ -130,9 +130,9 @@ Small additions to what we already have, not a new system:
 
 ## API additions
 
-- `POST /api/courses/generate` — starts a generation job, returns a job
+- `POST /api/courses/generate`: starts a generation job, returns a job
   id right away. Runs the pipeline as a background task.
-- `GET /api/generation-jobs/{id}` — poll status. On success, includes the
+- `GET /api/generation-jobs/{id}`: poll status. On success, includes the
   new course id.
 - `POST /api/source-sets` and file upload endpoints for RAG material,
   separate from course upload.

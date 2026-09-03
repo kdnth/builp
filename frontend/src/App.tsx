@@ -7,6 +7,8 @@ import SignInPage from './features/auth/SignInPage'
 import SignUpPage from './features/auth/SignUpPage'
 import CourseTreePage from './features/course-catalog/CourseTreePage'
 import UploadCoursePage from './features/course-catalog/UploadCoursePage'
+import GenerateCoursePage from './features/generation/GenerateCoursePage'
+import GenerationJobPage from './features/generation/GenerationJobPage'
 import UnitPage from './features/lesson-viewer/UnitPage'
 
 const theme = createTheme({
@@ -60,6 +62,11 @@ function App() {
             <Route path="/sign-in" element={<SignInPage />} />
             <Route path="/sign-up" element={<SignUpPage />} />
             <Route path="/courses/new" element={<UploadCoursePage />} />
+            <Route path="/courses/generate" element={<GenerateCoursePage />} />
+            <Route
+              path="/courses/generate/:jobId"
+              element={<GenerationJobPage />}
+            />
             <Route path="/courses/:courseId" element={<CourseTreePage />} />
             <Route
               path="/courses/:courseId/units/:unitId"

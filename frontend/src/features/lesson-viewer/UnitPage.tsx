@@ -1,20 +1,25 @@
+import { Center, Loader } from '@mantine/core'
 import { Navigate, useParams } from 'react-router-dom'
-import { useCourses } from '../../hooks/useCourses'
-import { findCourse } from '../../helpers/findCourse'
+import { useCourse } from '../../hooks/useCourse'
 import { useCourseProgress } from '../../hooks/useCourseProgress'
 import { isUnitUnlocked } from '../../helpers/progress'
 import UnitComponent from './UnitComponent'
 
 export default function UnitPage() {
   const { courseId, unitId } = useParams<{ courseId: string; unitId: string }>()
-  const { courses } = useCourses()
-  const course = courseId ? findCourse(courses, courseId) : undefined
-  const { completedLessonIds, markLessonComplete } = useCourseProgress(
-    courseId ?? '',
-  )
+  const { course, loading, notFound } = useCourse(courseId)
+  const { completedLessonIds, markLessonComplete } = useCourseProgress(courseId ?? '')
 
-  if (!course) {
+  if (notFound) {
     return <Navigate to="/" replace />
+  }
+
+  if (loading || !course) {
+    return (
+      <Center py={80}>
+        <Loader />
+      </Center>
+    )
   }
 
   const unitIndex = course.units.findIndex((u) => u.id === unitId)
