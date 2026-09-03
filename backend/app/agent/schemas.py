@@ -8,7 +8,7 @@ app/agent/assemble.py.
 
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, JsonValue
 
 # --- Stage 1: course overview -----------------------------------------
 
@@ -61,8 +61,10 @@ class UnitOutline(BaseModel):
 
 
 class GeneratedTestCase(BaseModel):
-    input: list[object]
-    expected_output: object = Field(
+    # OpenAI's structured-output schema validator rejects "items: {}" and
+    # untyped values. JsonValue expands to explicit JSON-compatible types.
+    input: list[JsonValue]
+    expected_output: JsonValue = Field(
         description="The exact value calling the reference solution with "
         "`input` should return."
     )
