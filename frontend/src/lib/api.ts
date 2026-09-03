@@ -27,13 +27,75 @@ export class ApiError extends Error {
   }
 }
 
+function detailEntryMessage(detail: unknown): string | null {
+  if (!detail || typeof detail !== 'object') {
+    return null
+  }
+  const record = detail as Record<string, unknown>
+  const msg = typeof record.msg === 'string' ? record.msg.trim() : ''
+  if (!msg) {
+    return null
+  }
+
+  if (Array.isArray(record.loc)) {
+    const fieldPath = record.loc
+      .filter((segment) => typeof segment === 'string')
+      .join('.')
+      .trim()
+    if (fieldPath) {
+      return `${fieldPath}: ${msg}`
+    }
+  }
+  return msg
+}
+
+function extractApiErrorMessage(body: unknown): string | null {
+  if (!body || typeof body !== 'object') {
+    return null
+  }
+  const record = body as Record<string, unknown>
+
+  const detail = record.detail
+  if (typeof detail === 'string' && detail.trim()) {
+    return detail
+  }
+
+  if (Array.isArray(detail)) {
+    for (const entry of detail) {
+      if (typeof entry === 'string' && entry.trim()) {
+        return entry
+      }
+      const parsed = detailEntryMessage(entry)
+      if (parsed) {
+        return parsed
+      }
+    }
+  }
+
+  if (detail && typeof detail === 'object') {
+    const detailRecord = detail as Record<string, unknown>
+    if (typeof detailRecord.message === 'string' && detailRecord.message.trim()) {
+      return detailRecord.message
+    }
+    if (typeof detailRecord.error === 'string' && detailRecord.error.trim()) {
+      return detailRecord.error
+    }
+  }
+
+  if (typeof record.message === 'string' && record.message.trim()) {
+    return record.message
+  }
+  return null
+}
+
 async function parseOrThrow<T>(
   response: Response,
   fallbackMessage: string,
 ): Promise<T> {
   if (!response.ok) {
     const body = await response.json().catch(() => null)
-    const detail = typeof body?.detail === 'string' ? body.detail : fallbackMessage
+    const detail =
+      extractApiErrorMessage(body) ?? `${fallbackMessage} (HTTP ${response.status}).`
     throw new ApiError(response.status, detail)
   }
   return response.json() as Promise<T>

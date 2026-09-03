@@ -1,3 +1,5 @@
+![Builp](./docs/assets/docs-logo.png)
+
 # builp
 
 Learn by building. Write, generate, and work through courses consisting of written lessons, runnable code practice, and interactive activities.
