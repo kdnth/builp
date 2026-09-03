@@ -14,6 +14,7 @@ import {
 } from '@mantine/core'
 import { WarningCircleIcon } from '@phosphor-icons/react'
 import { authClient, refreshSession } from '../../lib/auth'
+import { signUpErrorMessage } from '../../lib/authErrors'
 
 export default function SignUpPage() {
   const navigate = useNavigate()
@@ -28,15 +29,25 @@ export default function SignUpPage() {
     setError(null)
     setSubmitting(true)
     try {
-      const result = await authClient.signUp.email({ email, password, name })
+      const callbackURL = `${window.location.origin}/verify-email?email=${encodeURIComponent(email)}`
+      const result = await authClient.signUp.email({
+        email,
+        password,
+        name,
+        callbackURL,
+      })
       if (result.error) {
-        setError(result.error.message ?? 'Could not create an account.')
+        setError(signUpErrorMessage(result.error))
+        return
+      }
+      if (!result.data?.token || !result.data.user.emailVerified) {
+        navigate(`/verify-email?email=${encodeURIComponent(email)}&fromSignUp=1`)
         return
       }
       await refreshSession()
       navigate('/')
-    } catch {
-      setError('Could not create an account. Try again.')
+    } catch (caughtError) {
+      setError(signUpErrorMessage(caughtError))
     } finally {
       setSubmitting(false)
     }
@@ -65,6 +76,7 @@ export default function SignUpPage() {
               label="Password"
               value={password}
               onChange={(e) => setPassword(e.currentTarget.value)}
+              minLength={8}
               required
             />
             {error && (

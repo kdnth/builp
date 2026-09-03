@@ -10,7 +10,7 @@ from app.agent.schemas import (
 from app.agent.stage import StageOutcome
 
 
-def _passing_overview(*, topic, audience, num_units):
+def _passing_overview(*, topic, audience, num_units, model_config):
     overview = CourseOverview(
         title=f"Learn {topic}",
         description="A course.",
@@ -23,7 +23,7 @@ def _passing_overview(*, topic, audience, num_units):
     return StageOutcome(content=overview, passed=True, attempts=[])
 
 
-def _passing_unit_outline(*, overview, unit, lessons_per_unit):
+def _passing_unit_outline(*, overview, unit, lessons_per_unit, model_config):
     outline = UnitOutline(
         lessons=[
             LessonSummary(
@@ -38,7 +38,7 @@ def _passing_unit_outline(*, overview, unit, lessons_per_unit):
     return StageOutcome(content=outline, passed=True, attempts=[])
 
 
-def _passing_lesson_content(*, overview, unit, outline, lesson_index):
+def _passing_lesson_content(*, overview, unit, outline, lesson_index, model_config):
     content = LessonContent(
         written_lesson_markdown=f"# {outline.lessons[lesson_index].title}",
         code_practice=None,
@@ -103,7 +103,7 @@ def test_graph_result_validates_against_the_real_course_schema():
 
 
 def test_graph_handles_uneven_lesson_counts_per_unit():
-    def variable_unit_outline(*, overview, unit, lessons_per_unit):
+    def variable_unit_outline(*, overview, unit, lessons_per_unit, model_config):
         # unit N gets N lessons, not a fixed count
         count = int(unit.title.split()[-1])
         outline = UnitOutline(

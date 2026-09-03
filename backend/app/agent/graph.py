@@ -24,6 +24,7 @@ from langgraph.types import Command, Send
 
 from app.agent import nodes as default_nodes
 from app.agent.assemble import assemble_course, assemble_lesson
+from app.agent.llm import GenerationModelConfig, default_free_credit_model_config
 from app.agent.schemas import CourseOverview, LessonContent, UnitOutline, UnitSummary
 from app.agent.stage import StageOutcome
 from app.schemas.course import Course, Lesson
@@ -52,6 +53,7 @@ class GenerationState(TypedDict):
     audience: str
     num_units: int
     lessons_per_unit: int
+    model_config: GenerationModelConfig
     overview: CourseOverview
     overview_passed: bool
     unit_outlines: Annotated[list[UnitOutlineRecord], operator.add]
@@ -70,6 +72,7 @@ def build_graph(
             topic=state["topic"],
             audience=state["audience"],
             num_units=state["num_units"],
+            model_config=state["model_config"],
         )
         overview = outcome.content
         return Command(
@@ -82,6 +85,7 @@ def build_graph(
                         "unit_index": index,
                         "unit": unit,
                         "lessons_per_unit": state["lessons_per_unit"],
+                        "model_config": state["model_config"],
                     },
                 )
                 for index, unit in enumerate(overview.units)
@@ -93,6 +97,7 @@ def build_graph(
             overview=payload["overview"],
             unit=payload["unit"],
             lessons_per_unit=payload["lessons_per_unit"],
+            model_config=payload["model_config"],
         )
         outline = outcome.content
         record: UnitOutlineRecord = {
@@ -112,6 +117,7 @@ def build_graph(
                         "unit_index": payload["unit_index"],
                         "outline": outline,
                         "lesson_index": lesson_index,
+                        "model_config": payload["model_config"],
                     },
                 )
                 for lesson_index in range(len(outline.lessons))
@@ -124,6 +130,7 @@ def build_graph(
             unit=payload["unit"],
             outline=payload["outline"],
             lesson_index=payload["lesson_index"],
+            model_config=payload["model_config"],
         )
         lesson_title = payload["outline"].lessons[payload["lesson_index"]].title
         lesson = assemble_lesson(lesson_title, outcome.content)
@@ -170,6 +177,7 @@ def run_generation(
     audience: str,
     num_units: int,
     lessons_per_unit: int,
+    model_config: GenerationModelConfig | None = None,
     graph: CompiledStateGraph | None = None,
 ) -> Course:
     compiled = graph or build_graph()
@@ -179,6 +187,7 @@ def run_generation(
             "audience": audience,
             "num_units": num_units,
             "lessons_per_unit": lessons_per_unit,
+            "model_config": model_config or default_free_credit_model_config(),
             "unit_outlines": [],
             "lesson_records": [],
         }

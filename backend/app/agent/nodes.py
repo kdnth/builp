@@ -13,7 +13,7 @@ from app.agent.checks import (
     check_outline_lesson_count,
     check_overview_unit_count,
 )
-from app.agent.llm import ModelTier, get_model
+from app.agent.llm import GenerationModelConfig, ModelTier, get_model
 from app.agent.schemas import (
     CourseOverview,
     EvaluationResult,
@@ -27,17 +27,25 @@ MAX_ATTEMPTS = 3
 
 
 def generate_overview(
-    *, topic: str, audience: str, num_units: int
+    *,
+    topic: str,
+    audience: str,
+    num_units: int,
+    model_config: GenerationModelConfig,
 ) -> StageOutcome[CourseOverview]:
     def generate(tier: ModelTier, feedback: str | None) -> CourseOverview:
-        model = get_model(tier).with_structured_output(CourseOverview)
+        model = get_model(tier=tier, model_config=model_config).with_structured_output(
+            CourseOverview
+        )
         messages = prompts.overview_generate_prompt(
             topic=topic, audience=audience, num_units=num_units, feedback=feedback
         )
         return model.invoke(messages)  # type: ignore[return-value]
 
     def evaluate(overview: CourseOverview) -> EvaluationResult:
-        model = get_model("fast").with_structured_output(EvaluationResult)
+        model = get_model(
+            tier="fast", model_config=model_config
+        ).with_structured_output(EvaluationResult)
         return model.invoke(prompts.overview_evaluate_prompt(overview))  # type: ignore[return-value]
 
     return run_stage_with_retries(
@@ -50,22 +58,34 @@ def generate_overview(
 
 
 def generate_unit_outline(
-    *, overview: CourseOverview, unit: UnitSummary, lessons_per_unit: int
+    *,
+    overview: CourseOverview,
+    unit: UnitSummary,
+    lessons_per_unit: int,
+    model_config: GenerationModelConfig,
 ) -> StageOutcome[UnitOutline]:
     def generate(tier: ModelTier, feedback: str | None) -> UnitOutline:
-        model = get_model(tier).with_structured_output(UnitOutline)
+        model = get_model(tier=tier, model_config=model_config).with_structured_output(
+            UnitOutline
+        )
         messages = prompts.unit_outline_generate_prompt(
             overview=overview,
             unit=unit,
             lessons_per_unit=lessons_per_unit,
             feedback=feedback,
+            provider=model_config.provider,
         )
         return model.invoke(messages)  # type: ignore[return-value]
 
     def evaluate(outline: UnitOutline) -> EvaluationResult:
-        model = get_model("fast").with_structured_output(EvaluationResult)
+        model = get_model(
+            tier="fast", model_config=model_config
+        ).with_structured_output(EvaluationResult)
         messages = prompts.unit_outline_evaluate_prompt(
-            overview=overview, unit=unit, outline=outline
+            overview=overview,
+            unit=unit,
+            outline=outline,
+            provider=model_config.provider,
         )
         return model.invoke(messages)  # type: ignore[return-value]
 
@@ -84,26 +104,33 @@ def generate_lesson_content(
     unit: UnitSummary,
     outline: UnitOutline,
     lesson_index: int,
+    model_config: GenerationModelConfig,
 ) -> StageOutcome[LessonContent]:
     def generate(tier: ModelTier, feedback: str | None) -> LessonContent:
-        model = get_model(tier).with_structured_output(LessonContent)
+        model = get_model(tier=tier, model_config=model_config).with_structured_output(
+            LessonContent
+        )
         messages = prompts.lesson_content_generate_prompt(
             overview=overview,
             unit=unit,
             outline=outline,
             lesson_index=lesson_index,
             feedback=feedback,
+            provider=model_config.provider,
         )
         return model.invoke(messages)  # type: ignore[return-value]
 
     def evaluate(content: LessonContent) -> EvaluationResult:
-        model = get_model("fast").with_structured_output(EvaluationResult)
+        model = get_model(
+            tier="fast", model_config=model_config
+        ).with_structured_output(EvaluationResult)
         messages = prompts.lesson_content_evaluate_prompt(
             overview=overview,
             unit=unit,
             outline=outline,
             lesson_index=lesson_index,
             content=content,
+            provider=model_config.provider,
         )
         return model.invoke(messages)  # type: ignore[return-value]
 

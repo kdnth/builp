@@ -5,19 +5,19 @@ from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # pydantic-settings parses .env into this module's own Settings fields, but
-# never touches os.environ itself. Libraries that read the environment
-# directly (ChatAnthropic looks up ANTHROPIC_API_KEY itself, for one) would
-# never see .env values without this. This module is imported by nearly
-# everything in the app, so loading here means it happens exactly once,
-# before anything needs it.
+# never touches os.environ itself. LLM integrations that read the
+# environment directly (for API keys, model flags, etc.) would never see .env
+# values without this. This module is imported by nearly everything in the
+# app, so loading here means it happens exactly once, before anything needs
+# it.
 load_dotenv()
 
 
 class Settings(BaseSettings):
     # extra="ignore": .env is shared with tools/libraries that read straight
-    # from the process environment (ChatAnthropic reads ANTHROPIC_API_KEY
-    # itself, for one). Settings only needs to declare the fields it uses;
-    # it shouldn't crash the app over keys meant for something else.
+    # from the process environment (LLM clients included). Settings only needs
+    # to declare the fields it uses; it shouldn't crash the app over keys
+    # meant for something else.
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="ignore"
     )

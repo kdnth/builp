@@ -5,6 +5,9 @@ import AppLayout from './features/layout/AppLayout'
 import HomeRoute from './features/marketing/HomeRoute'
 import SignInPage from './features/auth/SignInPage'
 import SignUpPage from './features/auth/SignUpPage'
+import VerifyEmailPage from './features/auth/VerifyEmailPage'
+import ForgotPasswordPage from './features/auth/ForgotPasswordPage'
+import ResetPasswordPage from './features/auth/ResetPasswordPage'
 import CourseTreePage from './features/course-catalog/CourseTreePage'
 import UploadCoursePage from './features/course-catalog/UploadCoursePage'
 import GenerateCoursePage from './features/generation/GenerateCoursePage'
@@ -61,6 +64,9 @@ function App() {
             <Route path="/" element={<HomeRoute />} />
             <Route path="/sign-in" element={<SignInPage />} />
             <Route path="/sign-up" element={<SignUpPage />} />
+            <Route path="/verify-email" element={<VerifyEmailPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/courses/new" element={<UploadCoursePage />} />
             <Route path="/courses/generate" element={<GenerateCoursePage />} />
             <Route
