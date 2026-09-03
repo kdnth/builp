@@ -53,6 +53,19 @@ npm run dev
 
 Open http://localhost:5173.
 
+### Auth configuration (Neon)
+
+These auth flows depend on Neon Auth settings in your Neon project:
+
+- Turn on **Sign-up with Email**.
+- Turn on **Verify at Sign-up** (recommended for production).
+- For verification links, configure a custom email provider. With Neon's shared
+  provider, use verification codes.
+- Add your app origins to trusted domains (for example `http://localhost:5173`
+  and your production domain) so auth redirects are accepted.
+
+Password reset is available when email authentication is enabled.
+
 ### Generation modes
 
 Users can choose one of two generation paths when creating a course:
