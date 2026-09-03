@@ -60,15 +60,29 @@ starting point, not a guarantee.
 
 ## API shape
 
-- `GET /api/courses` - list courses (id, title, unit count, lesson count). No auth.
-- `GET /api/courses/{course_id}` - full course document. No auth.
+- `GET /api/courses?q=&tag=` - list courses (id, title, unit/lesson count, tags, owner). No auth. `q` matches the title, `tag` filters to an exact tag.
+- `GET /api/courses/{course_id}` - full course document plus tags and owner. No auth.
 - `POST /api/courses` - create a course from a full course JSON document. Requires auth. Rejects a course whose `id` already exists.
+- `PATCH /api/courses/{course_id}/tags` - replace a course's tags. Requires auth. Only the course's author can call this.
 - `GET /api/courses/{course_id}/progress` - the signed-in user's completed lesson ids for a course. Requires auth.
 - `POST /api/courses/{course_id}/progress/lessons/{lesson_id}/complete` - mark a lesson complete for the signed-in user. Requires auth. Safe to call more than once.
+- `POST /api/generation-jobs` - start generating a course with AI. Requires auth. Returns immediately with a job id; runs as a background task.
+- `GET /api/generation-jobs/{job_id}` - poll a generation job's status. Requires auth. Returns the new course's id once it succeeds.
 
 Course documents are validated against `app/schemas/course.py`, which
 mirrors `frontend/src/schemas/course.ts` field for field. The backend never
-trusts frontend validation. It checks again on every upload.
+trusts frontend validation. It checks again on every upload. Tags and
+authorship are stored separately from the course document itself, so they
+never need a schema migration on the frontend side.
+
+## AI course generation
+
+`app/agent/` holds the course-writing pipeline: overview, then units, then
+lessons, each generated and checked before moving on. See
+`docs/plans/course-generation-agent.md` at the repo root for the design.
+Needs `ANTHROPIC_API_KEY` set. Without it, `POST /api/generation-jobs`
+still accepts the request, but the job fails with a clear error instead of
+silently doing nothing.
 
 ## Auth
 
