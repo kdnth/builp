@@ -1,4 +1,7 @@
+from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
+
+from app.models import GenerationJob
 
 
 def test_create_and_poll_generation_job(client):
@@ -57,6 +60,62 @@ def test_generation_job_is_scoped_per_user(client, current_user):
         app.dependency_overrides[get_current_user] = lambda: current_user
 
     assert response.status_code == 404
+
+
+def test_create_generation_job_rate_limited(client):
+    with patch("app.routers.generation.run_generation_job"):
+        first = client.post(
+            "/api/generation-jobs", json={"topic": "x", "audience": "y"}
+        )
+        assert first.status_code == 201
+
+        second = client.post(
+            "/api/generation-jobs", json={"topic": "x2", "audience": "y2"}
+        )
+
+    assert second.status_code == 429
+    assert "24 hours" in second.json()["detail"]
+
+
+def test_create_generation_job_allowed_after_rate_limit_window(client, db_session):
+    with patch("app.routers.generation.run_generation_job"):
+        first = client.post(
+            "/api/generation-jobs", json={"topic": "x", "audience": "y"}
+        )
+    assert first.status_code == 201
+
+    job = db_session.get(GenerationJob, first.json()["id"])
+    job.created_at = datetime.now(UTC) - timedelta(hours=25)
+    db_session.commit()
+
+    with patch("app.routers.generation.run_generation_job"):
+        second = client.post(
+            "/api/generation-jobs", json={"topic": "x2", "audience": "y2"}
+        )
+
+    assert second.status_code == 201
+
+
+def test_generation_rate_limit_is_scoped_per_user(client, current_user):
+    from app.auth import AuthenticatedUser, get_current_user
+    from app.main import app
+
+    with patch("app.routers.generation.run_generation_job"):
+        first = client.post(
+            "/api/generation-jobs", json={"topic": "x", "audience": "y"}
+        )
+    assert first.status_code == 201
+
+    app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(id="user-2")
+    try:
+        with patch("app.routers.generation.run_generation_job"):
+            other_user_response = client.post(
+                "/api/generation-jobs", json={"topic": "x", "audience": "y"}
+            )
+    finally:
+        app.dependency_overrides[get_current_user] = lambda: current_user
+
+    assert other_user_response.status_code == 201
 
 
 def test_create_generation_job_without_auth_is_rejected(client):

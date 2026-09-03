@@ -4,7 +4,7 @@ from collections.abc import Iterator
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.auth import AuthenticatedUser, get_current_user
@@ -42,6 +42,19 @@ def _override_get_db() -> Iterator:
 @pytest.fixture
 def current_user() -> AuthenticatedUser:
     return AuthenticatedUser(id="user-1", email="user1@example.com")
+
+
+@pytest.fixture
+def db_session() -> Iterator[Session]:
+    """A session for tests that need to set up or inspect DB state directly
+    (e.g. backdating a row's timestamp), separate from the session the app
+    uses to serve requests. Shares the same StaticPool connection, so
+    commits made here are visible to the app's own session."""
+    session = _TestingSessionLocal()
+    try:
+        yield session
+    finally:
+        session.close()
 
 
 @pytest.fixture
