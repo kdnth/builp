@@ -9,6 +9,7 @@ dependencies = [
     "fastapi>=0.141.1",
     "httpx>=0.28.1",
     "langchain-anthropic>=1.7.0",
+    "langchain-openai>=1.0.1",
     "langgraph>=1.2.11",
     "psycopg[binary]>=3.3.5",
     "pydantic>=2",

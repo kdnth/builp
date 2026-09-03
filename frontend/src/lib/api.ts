@@ -131,12 +131,35 @@ export interface GenerationJob {
   updated_at: string
 }
 
-export interface CreateGenerationJobInput {
+interface SharedCreateGenerationJobInput {
   topic: string
   audience: string
   num_units: number
   lessons_per_unit: number
 }
+
+export type GenerationMode = 'free_credit' | 'provider_api_key'
+export type SupportedGenerationProvider =
+  | 'anthropic'
+  | 'openai'
+  | 'groq'
+  | 'xai'
+  | 'mistral'
+  | 'gemini'
+  | 'ollama'
+  | 'deepseek'
+
+export type CreateGenerationJobInput =
+  | (SharedCreateGenerationJobInput & {
+      generation_mode: 'free_credit'
+      provider?: never
+      provider_api_key?: never
+    })
+  | (SharedCreateGenerationJobInput & {
+      generation_mode: 'provider_api_key'
+      provider: SupportedGenerationProvider
+      provider_api_key: string
+    })
 
 export async function createGenerationJob(
   input: CreateGenerationJobInput,

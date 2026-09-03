@@ -8,13 +8,26 @@ succeeded | failed.
 """
 
 from app.agent.graph import run_generation
+from app.agent.llm import GenerationModelConfig, default_free_credit_model_config
 from app.database import SessionLocal
 from app.models import Course as CourseModel
 from app.models import GenerationJob
 
 
-def run_generation_job(job_id: str) -> None:
+def _sanitize_error(message: str, *, secrets: list[str]) -> str:
+    sanitized = message
+    for secret in secrets:
+        normalized = secret.strip()
+        if normalized:
+            sanitized = sanitized.replace(normalized, "[REDACTED]")
+    return sanitized
+
+
+def run_generation_job(
+    job_id: str, model_config: GenerationModelConfig | None = None
+) -> None:
     db = SessionLocal()
+    active_model_config = model_config or default_free_credit_model_config()
     try:
         job = db.get(GenerationJob, job_id)
         if job is None:
@@ -29,13 +42,16 @@ def run_generation_job(job_id: str) -> None:
                 audience=job.audience,
                 num_units=job.num_units,
                 lessons_per_unit=job.lessons_per_unit,
+                model_config=active_model_config,
             )
         except Exception as exc:
             # This is the top-level job boundary: every failure, model
             # error included, must land in the job row rather than crash
             # a background thread silently.
             job.status = "failed"
-            job.error = str(exc)[:2000]
+            job.error = _sanitize_error(
+                str(exc), secrets=[active_model_config.api_key or ""]
+            )[:2000]
             db.commit()
             return
 

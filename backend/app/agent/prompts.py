@@ -1,17 +1,17 @@
 """Prompt construction.
 
 Each stage's system message is built from stable, reused context (the
-overview, a unit's outline) via `cached_system_message`, so sibling calls
-that share that prefix (other units off the same overview, other lessons
-in the same unit) hit Anthropic's prompt cache instead of re-billing for
-it. The per-call instruction (which unit, which lesson, retry feedback)
-goes in a separate, uncached human message, since it's different on every
-call and caching it would do nothing but add overhead.
+overview, a unit's outline) via `cached_system_message`. Anthropic gets
+prompt cache breakpoints on that stable prefix; other providers fall back
+to plain system messages. The per-call instruction (which unit, which
+lesson, retry feedback) goes in a separate, uncached human message, since
+it's different on every call and caching it would do nothing but add
+overhead.
 """
 
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 
-from app.agent.llm import cached_system_message
+from app.agent.llm import SupportedProvider, cached_system_message
 from app.agent.schemas import CourseOverview, LessonContent, UnitOutline, UnitSummary
 
 
@@ -108,9 +108,11 @@ def unit_outline_generate_prompt(
     unit: UnitSummary,
     lessons_per_unit: int,
     feedback: str | None,
+    provider: SupportedProvider,
 ) -> list[BaseMessage]:
     system = cached_system_message(
-        f"{UNIT_OUTLINE_SYSTEM}\n\n{render_overview(overview)}"
+        f"{UNIT_OUTLINE_SYSTEM}\n\n{render_overview(overview)}",
+        provider=provider,
     )
     human = (
         f'Write the outline for this unit: "{unit.title}" - {unit.goal}\n'
@@ -138,9 +140,11 @@ def unit_outline_evaluate_prompt(
     overview: CourseOverview,
     unit: UnitSummary,
     outline: UnitOutline,
+    provider: SupportedProvider,
 ) -> list[BaseMessage]:
     system = cached_system_message(
-        f"{UNIT_OUTLINE_EVAL_SYSTEM}\n\n{render_overview(overview)}"
+        f"{UNIT_OUTLINE_EVAL_SYSTEM}\n\n{render_overview(overview)}",
+        provider=provider,
     )
     human = render_unit_outline(unit, outline)
     return [system, HumanMessage(content=human)]
@@ -190,6 +194,7 @@ def lesson_content_generate_prompt(
     outline: UnitOutline,
     lesson_index: int,
     feedback: str | None,
+    provider: SupportedProvider,
 ) -> list[BaseMessage]:
     lesson = outline.lessons[lesson_index]
     context = (
@@ -197,7 +202,7 @@ def lesson_content_generate_prompt(
         f"Course audience: {overview.audience}\n\n"
         f"{render_unit_outline(unit, outline)}"
     )
-    system = cached_system_message(context)
+    system = cached_system_message(context, provider=provider)
 
     extras = []
     if lesson.include_code_practice:
@@ -239,6 +244,7 @@ def lesson_content_evaluate_prompt(
     outline: UnitOutline,
     lesson_index: int,
     content: LessonContent,
+    provider: SupportedProvider,
 ) -> list[BaseMessage]:
     lesson = outline.lessons[lesson_index]
     context = (
@@ -246,7 +252,7 @@ def lesson_content_evaluate_prompt(
         f"Course audience: {overview.audience}\n\n"
         f"{render_unit_outline(unit, outline)}"
     )
-    system = cached_system_message(context)
+    system = cached_system_message(context, provider=provider)
     human = (
         f'Lesson: "{lesson.title}" - {lesson.goal}\n\n'
         f"{content.model_dump_json(indent=2)}"

@@ -9,7 +9,7 @@ Live at [builp.kdnth.co](https://builp.kdnth.co).
 - **Frontend**: React, TypeScript, Vite, Mantine
 - **Backend**: FastAPI, SQLAlchemy, Alembic, Postgres
 - **Auth**: Neon Auth
-- **Course generation**: LangGraph, Claude (Anthropic)
+- **Course generation**: LangGraph, provider-tiered LLM routing (Anthropic, OpenAI, Groq, xAI, Mistral, Gemini, Ollama, DeepSeek)
 
 ## Project layout
 
@@ -26,7 +26,7 @@ You need:
 - Node 20 or later
 - Python 3.12 or later, and [uv](https://docs.astral.sh/uv/)
 - A [Neon](https://neon.tech) project, with Neon Auth turned on
-- An [Anthropic API key](https://console.anthropic.com), for course generation
+- An [Anthropic API key](https://console.anthropic.com), for the server-managed free generation credit path
 
 ### Backend
 
@@ -52,6 +52,16 @@ npm run dev
 ```
 
 Open http://localhost:5173.
+
+### Generation modes
+
+Users can choose one of two generation paths when creating a course:
+
+- **Free credit**: one generation per rolling 24-hour window, using the server-managed Anthropic key.
+- **Provider API key**: bypasses the daily free-credit limit by supplying an `anthropic`, `openai`, `groq`, `xai`, `mistral`, `gemini`, `ollama`, or `deepseek` API key. The key is used in-memory for that generation request only and is not written to the database or logs.
+
+Default model tier maps and provider endpoint overrides are documented in
+`backend/README.md`.
 
 ## Roadmap
 
