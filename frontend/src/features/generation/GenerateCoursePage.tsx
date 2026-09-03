@@ -13,7 +13,7 @@ import {
   Title,
 } from '@mantine/core'
 import { MagicWandIcon, WarningCircleIcon } from '@phosphor-icons/react'
-import { createGenerationJob } from '../../lib/api'
+import { ApiError, createGenerationJob } from '../../lib/api'
 import { useAuthSession } from '../../lib/auth'
 
 export default function GenerateCoursePage() {
@@ -38,8 +38,12 @@ export default function GenerateCoursePage() {
         lessons_per_unit: lessonsPerUnit,
       })
       navigate(`/courses/generate/${job.id}`)
-    } catch {
-      setError('Could not start course generation. Try again.')
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : 'Could not start course generation. Try again.',
+      )
     } finally {
       setSubmitting(false)
     }
