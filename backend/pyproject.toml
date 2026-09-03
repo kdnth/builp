@@ -1,0 +1,43 @@
+[project]
+name = "course-builder-api"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "alembic>=1.19.1",
+    "fastapi>=0.141.1",
+    "httpx>=0.28.1",
+    "psycopg[binary]>=3.3.5",
+    "pydantic>=2",
+    "pydantic-settings>=2.15.0",
+    "pyjwt[crypto]>=2.13.0",
+    "sqlalchemy>=2.0",
+    "uvicorn[standard]>=0.52.4",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.16.5",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.ruff]
+target-version = "py312"
+extend-exclude = ["alembic/versions"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = [
+    # Depends(...) as an argument default is FastAPI's own dependency
+    # injection pattern, not the mutable-default footgun this rule targets.
+    "B008",
+]
