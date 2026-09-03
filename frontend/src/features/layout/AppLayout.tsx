@@ -1,7 +1,41 @@
 import { Link, Outlet } from 'react-router-dom'
-import { Anchor, AppShell, Group, Image, Title } from '@mantine/core'
+import {
+  ActionIcon,
+  Anchor,
+  AppShell,
+  Group,
+  Image,
+  Title,
+  useMantineColorScheme,
+  useComputedColorScheme,
+} from '@mantine/core'
+import { MoonIcon, SunIcon } from '@phosphor-icons/react'
 import AuthStatus from './AuthStatus'
 import logo from '../../assets/logo.png'
+
+function ColorSchemeToggle() {
+  const { setColorScheme } = useMantineColorScheme()
+  const computedColorScheme = useComputedColorScheme('light')
+
+  function toggleColorScheme() {
+    setColorScheme(computedColorScheme === 'dark' ? 'light' : 'dark')
+  }
+
+  return (
+    <ActionIcon
+      onClick={toggleColorScheme}
+      variant="default"
+      size="lg"
+      aria-label="Toggle color scheme"
+    >
+      {computedColorScheme === 'dark' ? (
+        <SunIcon size={18} />
+      ) : (
+        <MoonIcon size={18} />
+      )}
+    </ActionIcon>
+  )
+}
 
 export default function AppLayout() {
   return (
@@ -14,7 +48,10 @@ export default function AppLayout() {
               <Title order={2}>builp</Title>
             </Group>
           </Anchor>
-          <AuthStatus />
+          <Group gap="sm">
+            <AuthStatus />
+            <ColorSchemeToggle />
+          </Group>
         </Group>
       </AppShell.Header>
       <AppShell.Main>

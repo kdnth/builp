@@ -9,23 +9,30 @@ import {
   Text,
   Title,
 } from '@mantine/core'
-import { ChartLineUpIcon, CodeIcon, ListChecksIcon } from '@phosphor-icons/react'
+import {
+  ChartLineUpIcon,
+  CodeIcon,
+  ListChecksIcon,
+} from '@phosphor-icons/react'
 
 const features = [
   {
     icon: CodeIcon,
     title: 'Run real code',
-    description: 'Practice functions and components with live tests and a live preview.',
+    description:
+      'Practice functions and components with live tests and a live preview.',
   },
   {
     icon: ListChecksIcon,
     title: 'Interactive practice',
-    description: 'Fill-in-the-blank, matching, and multiple choice, checked as you go.',
+    description:
+      'Fill-in-the-blank, matching, and multiple choice, checked as you go.',
   },
   {
     icon: ChartLineUpIcon,
     title: 'Track your progress',
-    description: 'Lessons unlock in order, so you always know where you left off.',
+    description:
+      'Lessons unlock in order, so you always know where you left off.',
   },
 ]
 
@@ -35,12 +42,11 @@ export default function LandingPage() {
       <Stack gap={60}>
         <Stack gap="md" align="center" ta="center">
           <Title order={1} size={42}>
-            Learn by building, not just reading
+            Take courses, your way
           </Title>
           <Text size="lg" c="dimmed" maw={520}>
-            Course Builder is a hands-on way to learn to code: written
-            lessons, runnable practice, and progress that carries across
-            every course.
+            builp is a hands-on way to learn to new concepts. Build courses with
+            written lessons, runnable code and interactive practice.
           </Text>
           <Group mt="md">
             <Button component={Link} to="/sign-up" size="md">

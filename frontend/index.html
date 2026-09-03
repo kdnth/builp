@@ -4,7 +4,27 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>frontend</title>
+    <meta name="theme-color" content="#7b00b9" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#b529b5" media="(prefers-color-scheme: dark)" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Jost:ital,wght@0,100..900;1,100..900&display=swap"
+      rel="stylesheet"
+    />
+    <title>builp</title>
+    <script>
+      try {
+        var stored = localStorage.getItem('mantine-color-scheme-value') || 'auto'
+        var resolved =
+          stored === 'auto'
+            ? window.matchMedia('(prefers-color-scheme: dark)').matches
+              ? 'dark'
+              : 'light'
+            : stored
+        document.documentElement.setAttribute('data-mantine-color-scheme', resolved)
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>
