@@ -11,7 +11,7 @@ Live at [builp.kdnth.co](https://builp.kdnth.co).
 - **Frontend**: React, TypeScript, Vite, Mantine
 - **Backend**: FastAPI, SQLAlchemy, Alembic, Postgres
 - **Auth**: Neon Auth
-- **Course generation**: LangGraph, provider-tiered LLM routing (Anthropic, OpenAI, Groq, xAI, Mistral, Gemini, Ollama, DeepSeek)
+- **Course generation**: LangGraph, tiered Anthropic model routing
 
 ## Project layout
 
@@ -73,10 +73,9 @@ Password reset is available when email authentication is enabled.
 Users can choose one of two generation paths when creating a course:
 
 - **Free credit**: one generation per rolling 24-hour window, using the server-managed Anthropic key.
-- **Provider API key**: bypasses the daily free-credit limit by supplying an `anthropic`, `openai`, `groq`, `xai`, `mistral`, `gemini`, `ollama`, or `deepseek` API key. The key is used in-memory for that generation request only and is not written to the database or logs.
+- **Provider API key**: bypasses the daily free-credit limit by supplying your own `anthropic` API key. The key is used in-memory for that generation request only and is not written to the database or logs.
 
-Default model tier maps and provider endpoint overrides are documented in
-`backend/README.md`.
+Default model tier maps and overrides are documented in `backend/README.md`.
 
 ## Roadmap
 

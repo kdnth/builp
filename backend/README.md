@@ -68,7 +68,7 @@ starting point, not a guarantee.
 - `POST /api/courses/{course_id}/progress/lessons/{lesson_id}/complete` - mark a lesson complete for the signed-in user. Requires auth. Safe to call more than once.
 - `POST /api/generation-jobs` - start generating a course with AI. Requires auth. Returns immediately with a job id; runs as a background task. Supports two modes:
   - `generation_mode=free_credit` (default): server-managed provider key, one request per rolling 24-hour window per user.
-  - `generation_mode=provider_api_key`: user supplies `provider` (`anthropic`, `openai`, `groq`, `xai`, `mistral`, `gemini`, `ollama`, or `deepseek`) and `provider_api_key`, and this bypasses the free-credit rate limit.
+  - `generation_mode=provider_api_key`: user supplies `provider` (`anthropic`) and `provider_api_key`, and this bypasses the free-credit rate limit.
 - `GET /api/generation-jobs/{job_id}` - poll a generation job's status. Requires auth. Returns the new course's id once it succeeds.
 
 Course documents are validated against `app/schemas/course.py`, which
@@ -86,39 +86,24 @@ lessons, each generated and checked before moving on. See
 Provider support and key handling:
 
 - Free-credit mode uses the server-managed Anthropic key (`ANTHROPIC_API_KEY`).
-- Provider-key mode supports `anthropic`, `openai`, `groq`, `xai`, `mistral`, `gemini`, `ollama`, and `deepseek`.
+- Provider-key mode currently supports `anthropic` only.
 - User-supplied keys are passed to the background generation task in memory
   only; they are never written to database rows or persisted in logs.
-- Ollama usually runs unauthenticated; if your server has no auth, pass a
-  non-empty placeholder value (for example `ollama`) as `provider_api_key`.
 
 Without `ANTHROPIC_API_KEY`, free-credit jobs still get accepted, but those
 jobs fail with a clear error instead of silently doing nothing.
 
-### Default provider tier maps
+### Default model tier map
 
 These are the defaults used by `app/agent/llm.py` for stage tiering:
 
 - `anthropic`: `fast=claude-haiku-4-5`, `standard=claude-sonnet-5`, `strong=claude-opus-5`
-- `openai`: `fast=gpt-4o-mini`, `standard=gpt-4o`, `strong=gpt-4.1`
-- `groq`: `fast=llama-3.1-8b-instant`, `standard=llama-3.3-70b-versatile`, `strong=deepseek-r1-distill-llama-70b`
-- `xai`: `fast=grok-3-mini`, `standard=grok-3`, `strong=grok-4`
-- `mistral`: `fast=ministral-8b-latest`, `standard=mistral-small-latest`, `strong=mistral-large-latest`
-- `gemini`: `fast=gemini-2.5-flash-lite`, `standard=gemini-2.5-flash`, `strong=gemini-2.5-pro`
-- `ollama`: `fast=llama3.1:8b`, `standard=llama3.1:70b`, `strong=deepseek-r1:32b`
-- `deepseek`: `fast=deepseek-chat`, `standard=deepseek-chat`, `strong=deepseek-reasoner`
 
-### Provider endpoint and model overrides
+### Model overrides
 
-All non-Anthropic providers run through OpenAI-compatible chat transport.
-Defaults can be overridden without code changes:
-
-- Base URL override env vars: `OPENAI_BASE_URL`, `GROQ_BASE_URL`,
-  `XAI_BASE_URL`, `MISTRAL_BASE_URL`, `GEMINI_BASE_URL`,
-  `OLLAMA_BASE_URL`, `DEEPSEEK_BASE_URL`
-- Model override pattern:
-  `COURSE_GEN_MODEL_<PROVIDER>_<TIER>` (for example
-  `COURSE_GEN_MODEL_OLLAMA_STANDARD=qwen2.5:32b`)
+Defaults can be overridden without code changes via
+`COURSE_GEN_MODEL_<PROVIDER>_<TIER>` (for example
+`COURSE_GEN_MODEL_ANTHROPIC_STANDARD=claude-sonnet-5`).
 
 ## Auth
 
