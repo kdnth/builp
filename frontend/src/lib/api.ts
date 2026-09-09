@@ -201,15 +201,7 @@ interface SharedCreateGenerationJobInput {
 }
 
 export type GenerationMode = 'free_credit' | 'provider_api_key'
-export type SupportedGenerationProvider =
-  | 'anthropic'
-  | 'openai'
-  | 'groq'
-  | 'xai'
-  | 'mistral'
-  | 'gemini'
-  | 'ollama'
-  | 'deepseek'
+export type SupportedGenerationProvider = 'anthropic'
 
 export type CreateGenerationJobInput =
   | (SharedCreateGenerationJobInput & {

@@ -1,8 +1,6 @@
 from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
-import pytest
-
 from app.models import GenerationJob
 
 
@@ -98,7 +96,7 @@ def test_provider_api_key_mode_bypasses_rate_limit(client):
                 "topic": "x2",
                 "audience": "y2",
                 "generation_mode": "provider_api_key",
-                "provider": "openai",
+                "provider": "anthropic",
                 "provider_api_key": "sk-test",
             },
         )
@@ -106,10 +104,7 @@ def test_provider_api_key_mode_bypasses_rate_limit(client):
     assert second.status_code == 201
 
 
-@pytest.mark.parametrize(
-    "provider", ["groq", "xai", "mistral", "gemini", "ollama", "deepseek"]
-)
-def test_provider_api_key_mode_accepts_new_supported_providers(client, provider):
+def test_provider_api_key_mode_rejects_unsupported_provider(client):
     with patch("app.routers.generation.run_generation_job"):
         response = client.post(
             "/api/generation-jobs",
@@ -117,12 +112,12 @@ def test_provider_api_key_mode_accepts_new_supported_providers(client, provider)
                 "topic": "x",
                 "audience": "y",
                 "generation_mode": "provider_api_key",
-                "provider": provider,
+                "provider": "openai",
                 "provider_api_key": "provider-key",
             },
         )
 
-    assert response.status_code == 201
+    assert response.status_code == 422
 
 
 def test_provider_api_key_mode_passes_config_to_background_task(client):
@@ -133,7 +128,7 @@ def test_provider_api_key_mode_passes_config_to_background_task(client):
                 "topic": "x",
                 "audience": "y",
                 "generation_mode": "provider_api_key",
-                "provider": "openai",
+                "provider": "anthropic",
                 "provider_api_key": "sk-test",
             },
         )
@@ -141,7 +136,7 @@ def test_provider_api_key_mode_passes_config_to_background_task(client):
     assert response.status_code == 201
     assert run_job.call_count == 1
     _, model_config = run_job.call_args.args
-    assert model_config.provider == "openai"
+    assert model_config.provider == "anthropic"
     assert model_config.api_key == "sk-test"
 
 
@@ -182,7 +177,7 @@ def test_provider_api_key_mode_requires_key(client):
                 "topic": "x",
                 "audience": "y",
                 "generation_mode": "provider_api_key",
-                "provider": "openai",
+                "provider": "anthropic",
             },
         )
 
@@ -198,7 +193,7 @@ def test_provider_api_key_mode_rejects_blank_key(client):
                 "topic": "x",
                 "audience": "y",
                 "generation_mode": "provider_api_key",
-                "provider": "openai",
+                "provider": "anthropic",
                 "provider_api_key": "   ",
             },
         )
@@ -215,7 +210,7 @@ def test_free_credit_mode_rejects_provider_credentials(client):
                 "topic": "x",
                 "audience": "y",
                 "generation_mode": "free_credit",
-                "provider": "openai",
+                "provider": "anthropic",
                 "provider_api_key": "sk-test",
             },
         )

@@ -5,16 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
 JobStatus = Literal["pending", "running", "succeeded", "failed"]
 GenerationMode = Literal["free_credit", "provider_api_key"]
-SupportedProvider = Literal[
-    "anthropic",
-    "openai",
-    "groq",
-    "xai",
-    "mistral",
-    "gemini",
-    "ollama",
-    "deepseek",
-]
+SupportedProvider = Literal["anthropic"]
 
 
 class CreateGenerationJobRequest(BaseModel):

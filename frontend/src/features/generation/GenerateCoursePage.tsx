@@ -9,7 +9,6 @@ import {
   PasswordInput,
   Paper,
   Radio,
-  Select,
   Stack,
   Text,
   TextInput,
@@ -21,20 +20,8 @@ import {
   createGenerationJob,
   type CreateGenerationJobInput,
   type GenerationMode,
-  type SupportedGenerationProvider,
 } from '../../lib/api'
 import { useAuthSession } from '../../lib/auth'
-
-const PROVIDER_OPTIONS: Array<{ value: SupportedGenerationProvider; label: string }> = [
-  { value: 'anthropic', label: 'Anthropic' },
-  { value: 'openai', label: 'OpenAI' },
-  { value: 'groq', label: 'Groq' },
-  { value: 'xai', label: 'xAI' },
-  { value: 'mistral', label: 'Mistral' },
-  { value: 'gemini', label: 'Gemini' },
-  { value: 'ollama', label: 'Ollama' },
-  { value: 'deepseek', label: 'DeepSeek' },
-]
 
 export default function GenerateCoursePage() {
   const navigate = useNavigate()
@@ -44,7 +31,6 @@ export default function GenerateCoursePage() {
   const [numUnits, setNumUnits] = useState(3)
   const [lessonsPerUnit, setLessonsPerUnit] = useState(3)
   const [generationMode, setGenerationMode] = useState<GenerationMode>('free_credit')
-  const [provider, setProvider] = useState<SupportedGenerationProvider | null>(null)
   const [providerApiKey, setProviderApiKey] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -63,21 +49,16 @@ export default function GenerateCoursePage() {
 
       let input: CreateGenerationJobInput
       if (generationMode === 'provider_api_key') {
-        if (!provider) {
-          setError('Pick a provider before generating with your own API key.')
-          setSubmitting(false)
-          return
-        }
         const trimmedKey = providerApiKey.trim()
         if (!trimmedKey) {
-          setError('Enter your provider API key.')
+          setError('Enter your Anthropic API key.')
           setSubmitting(false)
           return
         }
         input = {
           ...baseInput,
           generation_mode: 'provider_api_key',
-          provider,
+          provider: 'anthropic',
           provider_api_key: trimmedKey,
         }
       } else {
@@ -150,13 +131,12 @@ export default function GenerateCoursePage() {
             />
             <Radio.Group
               label="Generation mode"
-              description="Choose the daily free credit path or bring your own provider key."
+              description="Choose the daily free credit path or bring your own Anthropic API key."
               value={generationMode}
               onChange={(value) => {
                 const nextMode = value as GenerationMode
                 setGenerationMode(nextMode)
                 if (nextMode === 'free_credit') {
-                  setProvider(null)
                   setProviderApiKey('')
                 }
               }}
@@ -168,34 +148,18 @@ export default function GenerateCoursePage() {
                 />
                 <Radio
                   value="provider_api_key"
-                  label="Use my own provider API key (bypasses the daily free-credit limit)."
+                  label="Use my own Anthropic API key (bypasses the daily free-credit limit)."
                 />
               </Stack>
             </Radio.Group>
             {generationMode === 'provider_api_key' && (
-              <Stack gap="xs">
-                <Select
-                  label="Provider"
-                  placeholder="Pick a provider"
-                  data={PROVIDER_OPTIONS}
-                  value={provider}
-                  onChange={(value) =>
-                    setProvider((value as SupportedGenerationProvider | null) ?? null)
-                  }
-                  required
-                />
-                <PasswordInput
-                  label="Provider API key"
-                  placeholder={
-                    provider === 'ollama'
-                      ? "If your Ollama server has no auth, use 'ollama'"
-                      : 'Paste your key'
-                  }
-                  value={providerApiKey}
-                  onChange={(e) => setProviderApiKey(e.currentTarget.value)}
-                  required
-                />
-              </Stack>
+              <PasswordInput
+                label="Anthropic API key"
+                placeholder="Paste your key"
+                value={providerApiKey}
+                onChange={(e) => setProviderApiKey(e.currentTarget.value)}
+                required
+              />
             )}
             <Alert radius="md" color="blue">
               If you use your own API key, it is held in memory for this
