@@ -41,7 +41,11 @@ class LessonProgress(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
-    course_id: Mapped[str] = mapped_column(ForeignKey("courses.id"), nullable=False)
+    # A deleted course's progress rows have no further purpose - nothing
+    # reads progress for a course that no longer exists - so this cascades.
+    course_id: Mapped[str] = mapped_column(
+        ForeignKey("courses.id", ondelete="CASCADE"), nullable=False
+    )
     lesson_id: Mapped[str] = mapped_column(String, nullable=False)
     completed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow
@@ -59,8 +63,12 @@ class GenerationJob(Base):
     audience: Mapped[str] = mapped_column(String, nullable=False)
     num_units: Mapped[int] = mapped_column(Integer, nullable=False)
     lessons_per_unit: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Detached, not cascaded, on course deletion: this row is the record
+    # that the generation happened at all (it backs the free-credit rate
+    # limit, which must survive the course being deleted), so it outlives
+    # the course. Only the link to the now-gone course is cleared.
     course_id: Mapped[str | None] = mapped_column(
-        ForeignKey("courses.id"), nullable=True
+        ForeignKey("courses.id", ondelete="SET NULL"), nullable=True
     )
     error: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(

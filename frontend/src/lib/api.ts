@@ -1,7 +1,25 @@
 import type { Course } from '../types/course'
 import { getJWTToken } from './auth'
 
-const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? ''
+const RAW_API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? ''
+
+function normalizeApiBaseUrl(value: string): string {
+  const trimmed = value.trim()
+  if (!trimmed) {
+    return ''
+  }
+  const withoutTrailingSlash = trimmed.replace(/\/+$/, '')
+  // Most routes in this app already include a leading /api segment; trim an
+  // accidentally configured base ".../api" to avoid ".../api/api/..." 404s.
+  return withoutTrailingSlash.replace(/\/api$/, '')
+}
+
+const API_URL = normalizeApiBaseUrl(RAW_API_URL)
+
+function buildApiUrl(path: string): string {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`
+  return API_URL ? `${API_URL}${normalizedPath}` : normalizedPath
+}
 
 async function authorizedFetch(
   path: string,
@@ -15,7 +33,7 @@ async function authorizedFetch(
   if (init.body && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
   }
-  return fetch(`${API_URL}${path}`, { ...init, headers })
+  return fetch(buildApiUrl(path), { ...init, headers })
 }
 
 export class ApiError extends Error {
@@ -74,7 +92,10 @@ function extractApiErrorMessage(body: unknown): string | null {
 
   if (detail && typeof detail === 'object') {
     const detailRecord = detail as Record<string, unknown>
-    if (typeof detailRecord.message === 'string' && detailRecord.message.trim()) {
+    if (
+      typeof detailRecord.message === 'string' &&
+      detailRecord.message.trim()
+    ) {
       return detailRecord.message
     }
     if (typeof detailRecord.error === 'string' && detailRecord.error.trim()) {
@@ -88,17 +109,80 @@ function extractApiErrorMessage(body: unknown): string | null {
   return null
 }
 
+function tryParseJson(value: string): unknown | null {
+  try {
+    return JSON.parse(value) as unknown
+  } catch {
+    return null
+  }
+}
+
+function extractPlainTextError(bodyText: string): string | null {
+  const trimmed = bodyText.trim()
+  if (!trimmed) {
+    return null
+  }
+
+  const plainText = trimmed
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  if (!plainText) {
+    return null
+  }
+  return plainText.slice(0, 240)
+}
+
+function responsePath(response: Response): string | null {
+  if (!response.url) {
+    return null
+  }
+  try {
+    return new URL(response.url).pathname
+  } catch {
+    return null
+  }
+}
+
+async function ensureOk(response: Response, fallbackMessage: string): Promise<void> {
+  if (response.ok) {
+    return
+  }
+  const bodyText = await response.text().catch(() => '')
+  const body = bodyText ? tryParseJson(bodyText) : null
+  const plainTextError = body ? null : extractPlainTextError(bodyText)
+  const path = responsePath(response)
+  const pathHint = path ? ` at ${path}` : ''
+  const apiHint =
+    !API_URL && response.status === 404
+      ? ' Set VITE_API_URL if frontend and backend are on different hosts.'
+      : ''
+  const detail =
+    extractApiErrorMessage(body) ??
+    plainTextError ??
+    `${fallbackMessage} (HTTP ${response.status}${pathHint}).`
+  throw new ApiError(response.status, `${detail}${apiHint}`)
+}
+
 async function parseOrThrow<T>(
   response: Response,
   fallbackMessage: string,
 ): Promise<T> {
-  if (!response.ok) {
-    const body = await response.json().catch(() => null)
-    const detail =
-      extractApiErrorMessage(body) ?? `${fallbackMessage} (HTTP ${response.status}).`
-    throw new ApiError(response.status, detail)
-  }
+  await ensureOk(response, fallbackMessage)
   return response.json() as Promise<T>
+}
+
+// For endpoints that respond with no body (204 No Content). Never calls
+// response.json() - unlike parseOrThrow, that's not a fallback for an empty
+// body, it's simply not part of this function's contract.
+async function parseVoidOrThrow(
+  response: Response,
+  fallbackMessage: string,
+): Promise<void> {
+  await ensureOk(response, fallbackMessage)
 }
 
 // --- Courses ---------------------------------------------------------
@@ -129,7 +213,9 @@ export async function listCourses(params?: {
   return parseOrThrow(response, 'Could not load courses.')
 }
 
-export async function getCourseFromApi(courseId: string): Promise<CourseDetail> {
+export async function getCourseFromApi(
+  courseId: string,
+): Promise<CourseDetail> {
   const response = await authorizedFetch(`/api/courses/${courseId}`)
   return parseOrThrow(response, 'Could not load this course.')
 }
@@ -151,6 +237,13 @@ export async function updateCourseTags(
     body: JSON.stringify({ tags }),
   })
   return parseOrThrow(response, 'Could not update tags.')
+}
+
+export async function deleteCourse(courseId: string): Promise<void> {
+  const response = await authorizedFetch(`/api/courses/${courseId}`, {
+    method: 'DELETE',
+  })
+  return parseVoidOrThrow(response, 'Could not delete this course.')
 }
 
 // --- Progress ----------------------------------------------------------

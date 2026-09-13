@@ -6,9 +6,44 @@ model has no reason to get right are assigned by code after generation, in
 app/agent/assemble.py.
 """
 
+import json
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, JsonValue
+from pydantic import BaseModel, BeforeValidator, Field, JsonValue, WithJsonSchema
+
+
+def _parse_json_encoded_value(value: object) -> object:
+    """Accept native JSON values or JSON-encoded strings.
+
+    OpenAI's structured-output validator requires every schema node to have a
+    `type`. Pydantic's JsonValue emits `{}` / a typeless `$ref`, which OpenAI
+    rejects. The LLM-facing schema is therefore `type: string`; this
+    validator turns those strings back into JSON values for the rest of the
+    pipeline. Native Python values (used by tests and non-OpenAI paths)
+    pass through unchanged.
+    """
+    if isinstance(value, str):
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError:
+            return value
+    return value
+
+
+# LLM schema: a JSON string. Python type: any JSON value.
+JsonEncodedValue = Annotated[
+    JsonValue,
+    BeforeValidator(_parse_json_encoded_value),
+    WithJsonSchema(
+        {
+            "type": "string",
+            "description": (
+                "JSON-encoded value. Examples: '3', '\"hello\"', 'true', "
+                "'null', '[1, 2]', '{\"a\": 1}'."
+            ),
+        }
+    ),
+]
 
 # --- Stage 1: course overview -----------------------------------------
 
@@ -61,12 +96,14 @@ class UnitOutline(BaseModel):
 
 
 class GeneratedTestCase(BaseModel):
-    # OpenAI's structured-output schema validator rejects "items: {}" and
-    # untyped values. JsonValue expands to explicit JSON-compatible types.
-    input: list[JsonValue]
-    expected_output: JsonValue = Field(
-        description="The exact value calling the reference solution with "
-        "`input` should return."
+    input: list[JsonEncodedValue] = Field(
+        description="Function arguments, each JSON-encoded as a string. "
+        "Examples: '1', '\"hello\"', 'true', '[1, 2]'."
+    )
+    expected_output: JsonEncodedValue = Field(
+        description="JSON-encoded expected return value from calling the "
+        "reference solution with `input`. Examples: '3', 'true', "
+        "'\"ok\"', '[1, 2]'."
     )
 
 

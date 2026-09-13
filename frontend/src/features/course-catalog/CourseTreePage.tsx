@@ -16,11 +16,17 @@ import {
   Title,
 } from '@mantine/core'
 import { Link, Navigate, useParams } from 'react-router-dom'
-import { CheckCircleIcon, CircleIcon, LockIcon, TagIcon } from '@phosphor-icons/react'
+import {
+  CheckCircleIcon,
+  CircleIcon,
+  LockIcon,
+  TagIcon,
+} from '@phosphor-icons/react'
 import { useCourse } from '../../hooks/useCourse'
 import { useCourseProgress } from '../../hooks/useCourseProgress'
 import { useAuthSession } from '../../lib/auth'
 import { updateCourseTags } from '../../lib/api'
+import { downloadCourseJson } from '../../lib/downloadCourseJson'
 import {
   countCompletedLessons,
   countTotalLessons,
@@ -40,7 +46,8 @@ function TagEditor({
 }) {
   const [draft, setDraft] = useState(tags)
   const [saving, setSaving] = useState(false)
-  const dirty = JSON.stringify([...draft].sort()) !== JSON.stringify([...tags].sort())
+  const dirty =
+    JSON.stringify([...draft].sort()) !== JSON.stringify([...tags].sort())
 
   async function handleSave() {
     setSaving(true)
@@ -100,9 +107,14 @@ export default function CourseTreePage() {
     <Container size="lg" py="xl">
       <Stack gap="lg">
         <Stack gap={4}>
-          <Anchor component={Link} to="/" size="sm">
-            ← All courses
-          </Anchor>
+          <Group justify="space-between">
+            <Anchor component={Link} to="/" size="sm">
+              ← All courses
+            </Anchor>
+            <Button size="sm" onClick={() => downloadCourseJson(course)}>
+              Download course JSON
+            </Button>
+          </Group>
           <Group justify="space-between" align="center">
             <Title order={1}>{course.title}</Title>
             <Badge color={percent === 100 ? 'green' : 'gray'} variant="light">
@@ -130,7 +142,11 @@ export default function CourseTreePage() {
 
         <Stack gap="sm">
           {course.units.map((unit, unitIndex) => {
-            const unlocked = isUnitUnlocked(completedLessonIds, course, unitIndex)
+            const unlocked = isUnitUnlocked(
+              completedLessonIds,
+              course,
+              unitIndex,
+            )
             const complete = isUnitComplete(completedLessonIds, unit)
             const completedInUnit = unit.lessons.filter((lesson) =>
               isLessonComplete(completedLessonIds, lesson.id),

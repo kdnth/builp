@@ -15,7 +15,11 @@ import {
   Title,
 } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
-import { BracketsCurlyIcon, UploadIcon, WarningCircleIcon } from '@phosphor-icons/react'
+import {
+  BracketsCurlyIcon,
+  UploadIcon,
+  WarningCircleIcon,
+} from '@phosphor-icons/react'
 import { courseSchema } from '../../schemas/course'
 import { ApiError, createCourseOnApi } from '../../lib/api'
 import { useAuthSession } from '../../lib/auth'
@@ -79,8 +83,8 @@ export default function UploadCoursePage() {
           <Stack gap="md">
             <Title order={2}>Upload Course</Title>
             <Text c="dimmed" size="sm">
-              Sign in to upload a course. Uploaded courses are attributed to
-              you and visible to everyone.
+              Sign in to upload a course. Uploaded courses are attributed to you
+              and visible to everyone.
             </Text>
             <Button component={Link} to="/sign-in">
               Sign in

@@ -1,5 +1,5 @@
 interface Pair {
-  id: string,
+  id: string
   term: string
   definition: string
 }
@@ -7,6 +7,6 @@ interface Pair {
 export interface Matching {
   type: 'matching'
   id: string
-  description?: string
+  description?: string | null
   pairs: Pair[]
 }
