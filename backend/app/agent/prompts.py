@@ -163,17 +163,19 @@ this is used only to verify your test suite is internally consistent, and \
 is never shown to the learner. Write at least 2 test cases that a correct \
 solution would pass, including at least one edge case.
 
-Critical constraint: every value in a test case's input and expectedOutput \
-must be a plain JSON value (number, string, boolean, array, object, or \
-null). Never a function, and never a string containing code meant to be \
-parsed as a function (like '(n) => n * 2') - test cases are run by calling \
-the solution directly with these exact values, so a stringified callback \
-would just be passed as a literal string, not called. This means: do not \
-write a code practice whose parameters need to be functions (no \
-'array.map'-style callback parameters, no comparator functions). Pick a \
-function signature for this lesson's concept that only needs plain data \
-values as arguments, even if the lesson's written content and interactive \
-activities do cover callbacks.
+Critical constraint: encode every test-case argument and expected_output \
+as a JSON string (for example '3', '"hello"', 'true', 'null', '[1, 2]', \
+'{"a": 1}'). After decoding, each value must be plain JSON (number, \
+string, boolean, array, object, or null). Never a function, and never a \
+string containing code meant to be parsed as a function (like \
+'(n) => n * 2') - test cases are run by calling the solution directly with \
+these exact values, so a stringified callback would just be passed as a \
+literal string, not called. This means: do not write a code practice \
+whose parameters need to be functions (no 'array.map'-style callback \
+parameters, no comparator functions). Pick a function signature for this \
+lesson's concept that only needs plain data values as arguments, even if \
+the lesson's written content and interactive activities do cover \
+callbacks.
 
 For a fillBlank activity: write text with each blank as the literal \
 token {{blank}}, and provide one entry in blanks for each token, in the \

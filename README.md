@@ -2,7 +2,7 @@
 
 # builp
 
-Learn by building. Write, generate, and work through courses consisting of written lessons, runnable code practice, and interactive activities.
+Write, generate, and work through courses consisting of written lessons, runnable code practice, and interactive activities.
 
 Live at [builp.kdnth.co](https://builp.kdnth.co).
 
@@ -11,7 +11,7 @@ Live at [builp.kdnth.co](https://builp.kdnth.co).
 - **Frontend**: React, TypeScript, Vite, Mantine
 - **Backend**: FastAPI, SQLAlchemy, Alembic, Postgres
 - **Auth**: Neon Auth
-- **Course generation**: LangGraph, tiered Anthropic model routing
+- **Course generation**: LangGraph, tiered Anthropic model routing. Plans to support other providers via API key are in the works.
 
 ## Project layout
 

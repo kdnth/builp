@@ -6,7 +6,7 @@ export interface Blank {
 export interface FillBlank {
   type: 'fillBlank'
   id: string
-  description?: string
+  description?: string | null
   text: string
   blanks: Blank[]
 }

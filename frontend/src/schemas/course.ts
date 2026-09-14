@@ -42,7 +42,7 @@ const matchingPairSchema = z.object({
 const matchingActivitySchema = z.object({
   type: z.literal('matching'),
   id: z.string().min(1),
-  description: z.string().optional(),
+  description: z.string().nullish(),
   pairs: z.array(matchingPairSchema).min(1),
 })
 
@@ -54,7 +54,7 @@ const blankSchema = z.object({
 const fillBlankActivitySchema = z.object({
   type: z.literal('fillBlank'),
   id: z.string().min(1),
-  description: z.string().optional(),
+  description: z.string().nullish(),
   text: z.string().min(1),
   blanks: z.array(blankSchema).min(1),
 })
@@ -62,7 +62,7 @@ const fillBlankActivitySchema = z.object({
 const multipleChoiceActivitySchema = z.object({
   type: z.literal('multipleChoice'),
   id: z.string().min(1),
-  description: z.string().optional(),
+  description: z.string().nullish(),
   question: z.string().min(1),
   options: z.array(z.string().min(1)).min(2),
   correctIndex: z.number().int().min(0),

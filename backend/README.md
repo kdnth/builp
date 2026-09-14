@@ -64,6 +64,7 @@ starting point, not a guarantee.
 - `GET /api/courses/{course_id}` - full course document plus tags and owner. No auth.
 - `POST /api/courses` - create a course from a full course JSON document. Requires auth. Rejects a course whose `id` already exists.
 - `PATCH /api/courses/{course_id}/tags` - replace a course's tags. Requires auth. Only the course's author can call this.
+- `DELETE /api/courses/{course_id}` - delete a course. Requires auth. Only the course's author can call this. Returns `204 No Content`.
 - `GET /api/courses/{course_id}/progress` - the signed-in user's completed lesson ids for a course. Requires auth.
 - `POST /api/courses/{course_id}/progress/lessons/{lesson_id}/complete` - mark a lesson complete for the signed-in user. Requires auth. Safe to call more than once.
 - `POST /api/generation-jobs` - start generating a course with AI. Requires auth. Returns immediately with a job id; runs as a background task. Supports two modes:

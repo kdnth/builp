@@ -13,6 +13,7 @@ import UploadCoursePage from './features/course-catalog/UploadCoursePage'
 import GenerateCoursePage from './features/generation/GenerateCoursePage'
 import GenerationJobPage from './features/generation/GenerationJobPage'
 import UnitPage from './features/lesson-viewer/UnitPage'
+import { TourProvider } from './features/tour/TourContext'
 
 const theme = createTheme({
   fontFamily: 'Jost, sans-serif',
@@ -58,30 +59,35 @@ const theme = createTheme({
 function App() {
   return (
     <MantineProvider theme={theme} defaultColorScheme="auto">
-      <BrowserRouter>
-        <Routes>
-          <Route element={<AppLayout />}>
-            <Route path="/" element={<HomeRoute />} />
-            <Route path="/sign-in" element={<SignInPage />} />
-            <Route path="/sign-up" element={<SignUpPage />} />
-            <Route path="/verify-email" element={<VerifyEmailPage />} />
-            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-            <Route path="/reset-password" element={<ResetPasswordPage />} />
-            <Route path="/courses/new" element={<UploadCoursePage />} />
-            <Route path="/courses/generate" element={<GenerateCoursePage />} />
-            <Route
-              path="/courses/generate/:jobId"
-              element={<GenerationJobPage />}
-            />
-            <Route path="/courses/:courseId" element={<CourseTreePage />} />
-            <Route
-              path="/courses/:courseId/units/:unitId"
-              element={<UnitPage />}
-            />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
+      <TourProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route element={<AppLayout />}>
+              <Route path="/" element={<HomeRoute />} />
+              <Route path="/sign-in" element={<SignInPage />} />
+              <Route path="/sign-up" element={<SignUpPage />} />
+              <Route path="/verify-email" element={<VerifyEmailPage />} />
+              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+              <Route path="/reset-password" element={<ResetPasswordPage />} />
+              <Route path="/courses/new" element={<UploadCoursePage />} />
+              <Route
+                path="/courses/generate"
+                element={<GenerateCoursePage />}
+              />
+              <Route
+                path="/courses/generate/:jobId"
+                element={<GenerationJobPage />}
+              />
+              <Route path="/courses/:courseId" element={<CourseTreePage />} />
+              <Route
+                path="/courses/:courseId/units/:unitId"
+                element={<UnitPage />}
+              />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </TourProvider>
     </MantineProvider>
   )
 }
