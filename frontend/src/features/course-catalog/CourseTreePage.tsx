@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Anchor,
   Badge,
@@ -14,12 +14,14 @@ import {
   Text,
   TagsInput,
   Title,
+  ActionIcon,
 } from '@mantine/core'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import {
   CheckCircleIcon,
   CircleIcon,
   LockIcon,
+  QuestionIcon,
   TagIcon,
 } from '@phosphor-icons/react'
 import { useCourse } from '../../hooks/useCourse'
@@ -27,6 +29,8 @@ import { useCourseProgress } from '../../hooks/useCourseProgress'
 import { useAuthSession } from '../../lib/auth'
 import { updateCourseTags } from '../../lib/api'
 import { downloadCourseJson } from '../../lib/downloadCourseJson'
+import { hasCompletedTour, useTour } from '../tour/TourContext'
+import type { TourStep } from '../tour/TourContext'
 import {
   countCompletedLessons,
   countTotalLessons,
@@ -56,8 +60,6 @@ function TagEditor({
       onSaved(result.tags)
       setDraft(result.tags)
     } catch {
-      // leave the draft as-is so the user can retry
-    } finally {
       setSaving(false)
     }
   }
@@ -79,11 +81,45 @@ function TagEditor({
   )
 }
 
+const COURSE_TREE_TOUR_ID = 'course-tree'
+
+const courseTreeTourSteps: TourStep[] = [
+  {
+    target: '[data-tour="course-progress"]',
+    title: 'Track your progress',
+    content: 'This bar fills in as you complete lessons across the course.',
+  },
+  {
+    target: '[data-tour="course-tags"]',
+    title: 'Organize with tags',
+    content: 'Add tags to help you find this course again from the catalog.',
+  },
+  {
+    target: '[data-tour="course-units"]',
+    title: 'Work through units in order',
+    content:
+      'Units unlock as you finish the ones before them. Locked units show a lock icon.',
+  },
+  {
+    target: '[data-tour="course-download"]',
+    title: 'Take it offline',
+    content:
+      'Download the full course as JSON any time you want a local copy to edit or reupload.',
+  },
+]
+
 export default function CourseTreePage() {
   const { courseId } = useParams<{ courseId: string }>()
   const { course, setCourse, loading, notFound } = useCourse(courseId)
   const session = useAuthSession()
   const { completedLessonIds } = useCourseProgress(courseId ?? '')
+  const { start } = useTour()
+
+  useEffect(() => {
+    if (!loading && course && !hasCompletedTour(COURSE_TREE_TOUR_ID)) {
+      start(COURSE_TREE_TOUR_ID, courseTreeTourSteps)
+    }
+  }, [loading, course, start])
 
   if (notFound) {
     return <Navigate to="/" replace />
@@ -111,9 +147,23 @@ export default function CourseTreePage() {
             <Anchor component={Link} to="/" size="sm">
               ← All courses
             </Anchor>
-            <Button size="sm" onClick={() => downloadCourseJson(course)}>
-              Download course JSON
-            </Button>
+            <Group gap="xs">
+              <ActionIcon
+                variant="light"
+                radius="xl"
+                size="lg"
+                onClick={() => start(COURSE_TREE_TOUR_ID, courseTreeTourSteps)}
+              >
+                <QuestionIcon size={20} />
+              </ActionIcon>
+              <Button
+                data-tour="course-download"
+                size="sm"
+                onClick={() => downloadCourseJson(course)}
+              >
+                Download course JSON
+              </Button>
+            </Group>
           </Group>
           <Group justify="space-between" align="center">
             <Title order={1}>{course.title}</Title>
@@ -121,26 +171,28 @@ export default function CourseTreePage() {
               {completed}/{total} lessons
             </Badge>
           </Group>
-          <Progress value={percent} radius="xl" />
+          <Progress data-tour="course-progress" value={percent} radius="xl" />
         </Stack>
 
-        {isOwner ? (
-          <TagEditor
-            courseId={course.id}
-            tags={course.tags}
-            onSaved={(tags) => setCourse({ ...course, tags })}
-          />
-        ) : course.tags.length > 0 ? (
-          <Group gap="xs">
-            {course.tags.map((tag) => (
-              <Badge key={tag} variant="light" color="gray">
-                {tag}
-              </Badge>
-            ))}
-          </Group>
-        ) : null}
+        <div data-tour="course-tags">
+          {isOwner ? (
+            <TagEditor
+              courseId={course.id}
+              tags={course.tags}
+              onSaved={(tags) => setCourse({ ...course, tags })}
+            />
+          ) : course.tags.length > 0 ? (
+            <Group gap="xs">
+              {course.tags.map((tag) => (
+                <Badge key={tag} variant="light" color="gray">
+                  {tag}
+                </Badge>
+              ))}
+            </Group>
+          ) : null}
+        </div>
 
-        <Stack gap="sm">
+        <Stack data-tour="course-units" gap="sm">
           {course.units.map((unit, unitIndex) => {
             const unlocked = isUnitUnlocked(
               completedLessonIds,

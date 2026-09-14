@@ -24,6 +24,7 @@ import {
   GraduationCapIcon,
   MagicWandIcon,
   MagnifyingGlassIcon,
+  QuestionIcon,
   TrashIcon,
   UploadIcon,
   WarningCircleIcon,
@@ -38,6 +39,7 @@ import {
 import { downloadCourseJson } from '../../lib/downloadCourseJson'
 import { useCourses } from '../../hooks/useCourses'
 import { useCourseProgress } from '../../hooks/useCourseProgress'
+import { hasCompletedTour, useTour, type TourStep } from '../tour/TourContext'
 
 type DeleteStep = 'closed' | 'confirm' | 'download-prompt'
 
@@ -158,7 +160,10 @@ function CourseCard({
             <Button variant="default" onClick={() => setDeleteStep('closed')}>
               Cancel
             </Button>
-            <Button color="red" onClick={() => setDeleteStep('download-prompt')}>
+            <Button
+              color="red"
+              onClick={() => setDeleteStep('download-prompt')}
+            >
               Continue
             </Button>
           </Group>
@@ -173,8 +178,8 @@ function CourseCard({
       >
         <Stack gap="md">
           <Text size="sm">
-            You will not be able to restore this course from the app. Would
-            you like to download the course as a JSON file to upload later?
+            You will not be able to restore this course from the app. Would you
+            like to download the course as a JSON file to upload later?
           </Text>
           <Group justify="end">
             <Button
@@ -206,11 +211,51 @@ function CourseCard({
   )
 }
 
+const COURSE_LIST_TOUR_ID = 'course-list'
+
+const courseListTourSteps: TourStep[] = [
+  {
+    target: '[data-tour="course-grid"]',
+    title: 'Look through your courses',
+    content: 'This page contains all courses saved to your account.',
+  },
+  {
+    target: '[data-tour="course-detail"]',
+    title: 'View course details',
+    content: 'Click on a course to see your progress and its details',
+  },
+  {
+    target: '[data-tour="search-course-list"]',
+    title: 'Search courses',
+    content:
+      'Use this search bar to search for specific courses by title. You can also click on course tags to filter the list for that tag.',
+  },
+  {
+    target: '[data-tour="course-upload"]',
+    title: 'Upload Course JSON',
+    content:
+      'Have your own course JSON file? Upload it here. This is a good option if you want to create your own courses without using the onboard generator - just make sure to use the schema!',
+  },
+  {
+    target: '[data-tour="course-generate"]',
+    title: 'Generate Course',
+    content:
+      'Use this button to generate a course based on a topic, audience, and a selected number of units and lessons. Generate once a day for free, or bring your own Anthropic API key.',
+  },
+]
+
 export default function CourseListPage() {
   const [searchInput, setSearchInput] = useState('')
   const [q, setQ] = useState('')
   const [tag, setTag] = useState<string | null>(null)
   const { courses, loading, refetch } = useCourses({ q, tag: tag ?? undefined })
+  const { start } = useTour()
+
+  useEffect(() => {
+    if (!loading && !hasCompletedTour(COURSE_LIST_TOUR_ID)) {
+      start(COURSE_LIST_TOUR_ID, courseListTourSteps)
+    }
+  }, [loading, start])
 
   useEffect(() => {
     const timeout = setTimeout(() => setQ(searchInput), 300)
@@ -223,7 +268,16 @@ export default function CourseListPage() {
         <Group justify="space-between" align="center">
           <Title order={1}>Courses</Title>
           <Group gap="sm">
+            <ActionIcon
+              variant="light"
+              radius="xl"
+              size="lg"
+              onClick={() => start(COURSE_LIST_TOUR_ID, courseListTourSteps)}
+            >
+              <QuestionIcon size={20} />
+            </ActionIcon>
             <Button
+              data-tour="course-generate"
               component={Link}
               to="/courses/generate"
               leftSection={<MagicWandIcon size={16} />}
@@ -231,6 +285,7 @@ export default function CourseListPage() {
               Generate Course
             </Button>
             <Button
+              data-tour="course-upload"
               component={Link}
               to="/courses/new"
               variant="default"
@@ -243,6 +298,7 @@ export default function CourseListPage() {
 
         <Group gap="sm">
           <TextInput
+            data-tour="search-course-list"
             placeholder="Search courses"
             value={searchInput}
             onChange={(e) => setSearchInput(e.currentTarget.value)}
@@ -266,22 +322,25 @@ export default function CourseListPage() {
           )}
         </Group>
 
-        {!loading && courses.length === 0 && (
-          <Text c="dimmed" size="sm">
-            No courses found.
-          </Text>
-        )}
+        <div data-tour="course-grid">
+          {!loading && courses.length === 0 && (
+            <Text c="dimmed" size="sm">
+              No courses found.
+            </Text>
+          )}
 
-        <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }}>
-          {courses.map((course) => (
-            <CourseCard
-              key={course.id}
-              course={course}
-              onTagClick={setTag}
-              onDeleted={refetch}
-            />
-          ))}
-        </SimpleGrid>
+          <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }}>
+            {courses.map((course) => (
+              <CourseCard
+                data-tour="course-detail"
+                key={course.id}
+                course={course}
+                onTagClick={setTag}
+                onDeleted={refetch}
+              />
+            ))}
+          </SimpleGrid>
+        </div>
       </Stack>
     </Container>
   )
