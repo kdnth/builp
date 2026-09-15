@@ -10,6 +10,7 @@ import {
 } from '../../helpers/activityMessages'
 import ActivityHeader from './ActivityHeader'
 import ActivityAlert from './ActivityAlert'
+import MatchingTile from './activity-components/MatchingTile'
 
 interface MatchingComponentProps {
   activity: Matching
@@ -19,13 +20,6 @@ interface MatchingComponentProps {
 interface Tile {
   id: string
   label: string
-}
-
-const tileLabelStyle: React.CSSProperties = {
-  minWidth: 0,
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
 }
 
 interface Match {
@@ -46,7 +40,8 @@ export default function MatchingComponent({
   onComplete,
 }: MatchingComponentProps) {
   const [selection, setSelection] = useState<Match>(emptyMatch)
-  const [incorrectSelection, setIncorrectSelection] = useState<Match>(emptyMatch)
+  const [incorrectSelection, setIncorrectSelection] =
+    useState<Match>(emptyMatch)
   const [matchedPairIds, setMatchedPairIds] = useState<Set<string>>(new Set())
   const [status, setStatus] = useState<ActivityStatus>(null)
   const [message, setMessage] = useState<string | null>(null)
@@ -152,7 +147,11 @@ export default function MatchingComponent({
   return (
     <Paper withBorder radius="md" p="lg">
       <Stack gap={'md'}>
-        <ActivityHeader title="Match Terms" status={status} onRedo={handleRedo} />
+        <ActivityHeader
+          title="Match Terms"
+          status={status}
+          onRedo={handleRedo}
+        />
         <Text>
           {activity.description != null
             ? activity.description
@@ -163,72 +162,32 @@ export default function MatchingComponent({
           <Grid.Col span={4}>
             <Stack gap={'sm'}>
               {termTiles.map((t) => (
-                <Button
+                <MatchingTile
                   key={t.id}
-                  value={t.id}
-                  title={t.label}
-                  fullWidth
-                  h={44}
-                  justify="flex-start"
-                  styles={{ inner: { minWidth: 0 }, label: tileLabelStyle }}
+                  id={t.id}
+                  label={t.label}
+                  isMatched={matchedPairIds.has(t.id)}
+                  isSelected={t.id === selection.termId}
+                  isIncorrect={t.id === incorrectSelection.termId}
+                  revealed={revealed}
                   onClick={handleTermTileClick}
-                  variant={
-                    matchedPairIds.has(t.id)
-                      ? 'filled'
-                      : t.id === selection.termId
-                        ? 'filled'
-                        : 'outline'
-                  }
-                  color={
-                    matchedPairIds.has(t.id)
-                      ? revealed
-                        ? 'yellow'
-                        : 'green'
-                      : t.id === selection.termId
-                        ? 'blue'
-                        : t.id === incorrectSelection.termId
-                          ? 'red'
-                          : 'gray'
-                  }
-                >
-                  {t.label}
-                </Button>
+                />
               ))}
             </Stack>
           </Grid.Col>
           <Grid.Col span={4}>
             <Stack gap={'sm'}>
               {definitionTiles.map((t) => (
-                <Button
+                <MatchingTile
                   key={t.id}
-                  value={t.id}
-                  title={t.label}
-                  fullWidth
-                  h={44}
-                  justify="flex-start"
-                  styles={{ inner: { minWidth: 0 }, label: tileLabelStyle }}
+                  id={t.id}
+                  label={t.label}
+                  isMatched={matchedPairIds.has(t.id)}
+                  isSelected={t.id === selection.definitionId}
+                  isIncorrect={t.id === incorrectSelection.definitionId}
+                  revealed={revealed}
                   onClick={handleDefinitionTileClick}
-                  variant={
-                    matchedPairIds.has(t.id)
-                      ? 'filled'
-                      : t.id === selection.definitionId
-                        ? 'filled'
-                        : 'outline'
-                  }
-                  color={
-                    matchedPairIds.has(t.id)
-                      ? revealed
-                        ? 'yellow'
-                        : 'green'
-                      : t.id === selection.definitionId
-                        ? 'blue'
-                        : t.id === incorrectSelection.definitionId
-                          ? 'red'
-                          : 'gray'
-                  }
-                >
-                  {t.label}
-                </Button>
+                />
               ))}
             </Stack>
           </Grid.Col>
