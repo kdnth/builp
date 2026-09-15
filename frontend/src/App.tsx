@@ -10,6 +10,7 @@ import VerifyEmailPage from './features/auth/VerifyEmailPage'
 import ForgotPasswordPage from './features/auth/ForgotPasswordPage'
 import ResetPasswordPage from './features/auth/ResetPasswordPage'
 import CourseTreePage from './features/course-catalog/CourseTreePage'
+import ExplorePage from './features/course-catalog/ExplorePage'
 import UploadCoursePage from './features/course-catalog/UploadCoursePage'
 import GenerateCoursePage from './features/generation/GenerateCoursePage'
 import GenerationJobPage from './features/generation/GenerationJobPage'
@@ -70,6 +71,7 @@ function App() {
               <Route path="/verify-email" element={<VerifyEmailPage />} />
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
               <Route path="/reset-password" element={<ResetPasswordPage />} />
+              <Route path="/explore" element={<ExplorePage />} />
               <Route path="/courses/new" element={<UploadCoursePage />} />
               <Route
                 path="/courses/generate"
@@ -79,17 +81,11 @@ function App() {
                 path="/courses/generate/:jobId"
                 element={<GenerationJobPage />}
               />
+              <Route path="/courses/:courseId" element={<CourseTreePage />} />
               <Route
-                path="/courses/:courseId"
-                element={
-                  <CourseProgressProvider>
-                    <Outlet />
-                  </CourseProgressProvider>
-                }
-              >
-                <Route index element={<CourseTreePage />} />
-                <Route path="units/:unitId" element={<UnitPage />} />
-              </Route>
+                path="/courses/:courseId/units/:unitId"
+                element={<UnitPage />}
+              />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Routes>

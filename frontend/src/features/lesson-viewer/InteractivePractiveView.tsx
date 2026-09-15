@@ -44,7 +44,7 @@ export default function InteractivePracticeView({
           </Badge>
         </Group>
         <Text c="dimmed" size="sm">
-          This is an interactive practice placeholder.
+          Interactive Practice
         </Text>
         <Group gap="xs">
           {view.activities.map((activity) => (
@@ -54,7 +54,11 @@ export default function InteractivePracticeView({
           ))}
         </Group>
         {allComplete && (
-          <Alert color="green" icon={<CheckCircleIcon weight="fill" />} radius="md">
+          <Alert
+            color="green"
+            icon={<CheckCircleIcon weight="fill" />}
+            radius="md"
+          >
             Nice work! You've completed all the activities in this practice.
           </Alert>
         )}
