@@ -133,6 +133,7 @@ class Course(BaseModel):
     id: str = Field(min_length=1)
     title: str = Field(min_length=1)
     units: list[Unit] = Field(min_length=1)
+    forkedFromId: str | None = None
 
 
 class CourseSummary(BaseModel):
@@ -142,6 +143,12 @@ class CourseSummary(BaseModel):
     lesson_count: int
     tags: list[str] = []
     owner_user_id: str | None = None
+    saved: bool = False
+
+
+class PaginatedCourses(BaseModel):
+    items: list[CourseSummary]
+    total: int
 
 
 class CourseDetail(Course):
@@ -159,7 +166,11 @@ class UpdateTagsRequest(BaseModel):
 
 
 def summarize(
-    course: Course, *, tags: list[str], owner_user_id: str | None
+    course: Course,
+    *,
+    tags: list[str],
+    owner_user_id: str | None,
+    saved: bool = False,
 ) -> CourseSummary:
     lesson_count = sum(len(unit.lessons) for unit in course.units)
     return CourseSummary(
@@ -169,4 +180,5 @@ def summarize(
         lesson_count=lesson_count,
         tags=tags,
         owner_user_id=owner_user_id,
+        saved=saved,
     )

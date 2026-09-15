@@ -194,6 +194,12 @@ export interface CourseSummary {
   lesson_count: number
   tags: string[]
   owner_user_id: string | null
+  saved: boolean
+}
+
+export interface PaginatedCourses {
+  items: CourseSummary[]
+  total: number
 }
 
 export type CourseDetail = Course & {
@@ -204,13 +210,36 @@ export type CourseDetail = Course & {
 export async function listCourses(params?: {
   q?: string
   tag?: string
-}): Promise<CourseSummary[]> {
+  ownerUserId?: string
+  // "My Courses" membership: owned by this user OR saved by them.
+  forUserId?: string
+  limit?: number
+  offset?: number
+}): Promise<PaginatedCourses> {
   const query = new URLSearchParams()
   if (params?.q) query.set('q', params.q)
   if (params?.tag) query.set('tag', params.tag)
+  if (params?.ownerUserId) query.set('owner_user_id', params.ownerUserId)
+  if (params?.forUserId) query.set('for_user_id', params.forUserId)
+  if (params?.limit != null) query.set('limit', String(params.limit))
+  if (params?.offset != null) query.set('offset', String(params.offset))
   const suffix = query.toString() ? `?${query.toString()}` : ''
   const response = await authorizedFetch(`/api/courses${suffix}`)
   return parseOrThrow(response, 'Could not load courses.')
+}
+
+export async function saveCourse(courseId: string): Promise<void> {
+  const response = await authorizedFetch(`/api/courses/${courseId}/save`, {
+    method: 'POST',
+  })
+  return parseVoidOrThrow(response, 'Could not save this course.')
+}
+
+export async function unsaveCourse(courseId: string): Promise<void> {
+  const response = await authorizedFetch(`/api/courses/${courseId}/save`, {
+    method: 'DELETE',
+  })
+  return parseVoidOrThrow(response, 'Could not unsave this course.')
 }
 
 export async function getCourseFromApi(

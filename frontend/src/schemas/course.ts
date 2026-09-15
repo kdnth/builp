@@ -98,6 +98,7 @@ export const courseSchema = z.object({
   id: z.string().min(1),
   title: z.string().min(1),
   units: z.array(unitSchema).min(1),
+  forkedFromId: z.string().min(1).nullable().optional(),
 })
 
 export type CourseInput = z.infer<typeof courseSchema>
