@@ -1,15 +1,19 @@
-import { Link, Outlet } from 'react-router-dom'
+import { Link, Outlet, useLocation } from 'react-router-dom'
 import {
   ActionIcon,
   Anchor,
   AppShell,
+  Box,
+  Burger,
   Group,
   Image,
+  NavLink,
   Title,
   useMantineColorScheme,
   useComputedColorScheme,
   Text,
 } from '@mantine/core'
+import { useDisclosure } from '@mantine/hooks'
 import {
   BookBookmarkIcon,
   CompassIcon,
@@ -18,6 +22,11 @@ import {
 } from '@phosphor-icons/react'
 import AuthStatus from './AuthStatus'
 import logo from '../../assets/logo.png'
+
+const navItems = [
+  { to: '/explore', label: 'Explore', Icon: CompassIcon },
+  { to: '/', label: 'My Courses', Icon: BookBookmarkIcon },
+]
 
 function ColorSchemeToggle() {
   const { setColorScheme } = useMantineColorScheme()
@@ -44,43 +53,82 @@ function ColorSchemeToggle() {
 }
 
 export default function AppLayout() {
+  const [opened, { toggle, close }] = useDisclosure(false)
+  const { pathname } = useLocation()
+
   return (
-    <AppShell header={{ height: 60 }} padding={0}>
+    <AppShell
+      header={{ height: 60 }}
+      navbar={{
+        width: 300,
+        breakpoint: 'sm',
+        collapsed: { mobile: !opened, desktop: true },
+      }}
+      padding={0}
+    >
       <AppShell.Header>
-        <Group h="100%" px="md" justify="space-between">
-          <Group gap={'lg'}>
-            <Anchor component={Link} to="/" underline="never" c="inherit">
-              <Group gap="xs">
+        <Group h="100%" px="md" justify="space-between" wrap="nowrap">
+          <Group gap={'lg'} wrap="nowrap">
+            <Burger
+              opened={opened}
+              onClick={toggle}
+              hiddenFrom="sm"
+              size="sm"
+              aria-label="Toggle navigation"
+            />
+            <Anchor
+              component={Link}
+              to="/"
+              underline="never"
+              c="inherit"
+              onClick={close}
+            >
+              <Group gap="xs" wrap="nowrap">
                 <Image src={logo} w={48} h={48} fit="contain" />
                 <Title order={2}>builp</Title>
               </Group>
             </Anchor>
-            <Group gap={'md'}>
-              <Anchor
-                component={Link}
-                to="/explore"
-                underline="never"
-                c="dimmed"
-              >
-                <Group gap={'xs'}>
-                  <CompassIcon size={16} />
-                  <Text>Explore</Text>
-                </Group>
-              </Anchor>
-              <Anchor component={Link} to="/" underline="never" c="dimmed">
-                <Group gap={'xs'}>
-                  <BookBookmarkIcon size={16} />
-                  <Text>My Courses</Text>
-                </Group>
-              </Anchor>
+            <Group gap={'md'} visibleFrom="sm">
+              {navItems.map(({ to, label, Icon }) => (
+                <Anchor
+                  key={to}
+                  component={Link}
+                  to={to}
+                  underline="never"
+                  c="dimmed"
+                >
+                  <Group gap={'xs'}>
+                    <Icon size={16} />
+                    <Text>{label}</Text>
+                  </Group>
+                </Anchor>
+              ))}
             </Group>
           </Group>
-          <Group gap="sm">
-            <AuthStatus />
+          <Group gap="sm" wrap="nowrap">
+            <Box visibleFrom="sm">
+              <AuthStatus />
+            </Box>
             <ColorSchemeToggle />
           </Group>
         </Group>
       </AppShell.Header>
+      <AppShell.Navbar p="md">
+        {navItems.map(({ to, label, Icon }) => (
+          <NavLink
+            key={to}
+            component={Link}
+            to={to}
+            label={label}
+            leftSection={<Icon size={16} />}
+            active={pathname === to}
+            onClick={close}
+          />
+        ))}
+        <Box mt="md" onClick={close}>
+          <AuthStatus />
+        </Box>
+      </AppShell.Navbar>
       <AppShell.Main>
         <Outlet />
       </AppShell.Main>
