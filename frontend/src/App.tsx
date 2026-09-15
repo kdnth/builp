@@ -1,7 +1,8 @@
 import '@mantine/core/styles.css'
 import { createTheme, MantineProvider, virtualColor } from '@mantine/core'
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom'
 import AppLayout from './features/layout/AppLayout'
+import { CourseProgressProvider } from './hooks/CourseProgressContext'
 import HomeRoute from './features/marketing/HomeRoute'
 import SignInPage from './features/auth/SignInPage'
 import SignUpPage from './features/auth/SignUpPage'
@@ -80,11 +81,17 @@ function App() {
                 path="/courses/generate/:jobId"
                 element={<GenerationJobPage />}
               />
-              <Route path="/courses/:courseId" element={<CourseTreePage />} />
               <Route
-                path="/courses/:courseId/units/:unitId"
-                element={<UnitPage />}
-              />
+                path="/courses/:courseId"
+                element={
+                  <CourseProgressProvider>
+                    <Outlet />
+                  </CourseProgressProvider>
+                }
+              >
+                <Route index element={<CourseTreePage />} />
+                <Route path="units/:unitId" element={<UnitPage />} />
+              </Route>
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Routes>
