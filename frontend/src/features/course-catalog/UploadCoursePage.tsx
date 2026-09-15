@@ -30,11 +30,13 @@ export default function UploadCoursePage() {
   const session = useAuthSession()
   const [fileName, setFileName] = useState<string | null>(null)
   const [issues, setIssues] = useState<string[] | null>(null)
+  const [uploadError, setUploadError] = useState<string | null>(null)
   const [schemaOpened, { open: openSchema, close: closeSchema }] =
     useDisclosure(false)
 
   async function handleFile(file: File | null) {
     setIssues(null)
+    setUploadError(null)
     setFileName(file?.name ?? null)
     if (!file) return
 
@@ -70,9 +72,9 @@ export default function UploadCoursePage() {
       const created = await createCourseOnApi(result.data)
       navigate(`/courses/${created.id}`)
     } catch (err) {
-      setIssues([
+      setUploadError(
         err instanceof ApiError ? err.message : 'Could not upload this course.',
-      ])
+      )
     }
   }
 
@@ -145,6 +147,23 @@ export default function UploadCoursePage() {
                 </List.Item>
               ))}
             </List>
+          </Alert>
+        )}
+
+        {uploadError && (
+          <Alert
+            color="red"
+            icon={<WarningCircleIcon weight="fill" />}
+            radius="md"
+            title="Upload failed"
+          >
+            <Text size="sm">
+              Your file passed validation, but uploading it to the server
+              failed:
+            </Text>
+            <Code block mt={4}>
+              {uploadError}
+            </Code>
           </Alert>
         )}
       </Stack>
