@@ -25,7 +25,7 @@ import {
   TagIcon,
 } from '@phosphor-icons/react'
 import { useCourse } from '../../hooks/useCourse'
-import { useCourseProgress } from '../../hooks/useCourseProgress'
+import { useCourseProgressContext } from '../../hooks/CourseProgressContext'
 import { useAuthSession } from '../../lib/auth'
 import { updateCourseTags } from '../../lib/api'
 import { downloadCourseJson } from '../../lib/downloadCourseJson'
@@ -112,7 +112,7 @@ export default function CourseTreePage() {
   const { courseId } = useParams<{ courseId: string }>()
   const { course, setCourse, loading, notFound } = useCourse(courseId)
   const session = useAuthSession()
-  const { completedLessonIds } = useCourseProgress(courseId ?? '')
+  const { completedLessonIds } = useCourseProgressContext()
   const { start } = useTour()
 
   useEffect(() => {
