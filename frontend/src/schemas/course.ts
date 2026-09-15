@@ -35,8 +35,8 @@ const codePracticeSchema = z.discriminatedUnion('type', [
 
 const matchingPairSchema = z.object({
   id: z.string().min(1),
-  term: z.string().min(1),
-  definition: z.string().min(1),
+  term: z.string().min(1).max(60),
+  definition: z.string().min(1).max(150),
 })
 
 const matchingActivitySchema = z.object({
