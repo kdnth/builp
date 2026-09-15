@@ -6,21 +6,21 @@ import {
   Container,
   Loader,
   Paper,
+  Progress,
   Stack,
   Text,
   Title,
 } from '@mantine/core'
 import { WarningCircleIcon } from '@phosphor-icons/react'
 import { ApiError, getGenerationJob, type GenerationJob } from '../../lib/api'
+import { unwatchJobId } from './generationJobsStore'
+import {
+  lessonProgressText,
+  progressLabel,
+  progressPercent,
+} from './generationProgress'
 
 const POLL_INTERVAL_MS = 2000
-
-const STAGE_LABELS: Record<GenerationJob['status'], string> = {
-  pending: 'Queued...',
-  running: 'Writing your course...',
-  succeeded: 'Done!',
-  failed: 'Something went wrong.',
-}
 
 export default function GenerationJobPage() {
   const { jobId } = useParams<{ jobId: string }>()
@@ -44,6 +44,8 @@ export default function GenerationJobPage() {
           timeoutId = setTimeout(poll, POLL_INTERVAL_MS)
           return
         }
+
+        unwatchJobId(latest.id)
 
         if (latest.status === 'succeeded') {
           if (!latest.course_id) {
@@ -110,17 +112,35 @@ export default function GenerationJobPage() {
     )
   }
 
+  const lessonText = job ? lessonProgressText(job) : null
+
   return (
     <Container size="xs" py="xl">
       <Paper withBorder radius="md" p="lg">
         <Stack gap="md" align="center" ta="center">
           <Loader />
-          <Title order={2}>{job ? STAGE_LABELS[job.status] : 'Starting...'}</Title>
+          <Title order={2}>
+            {job ? `${progressLabel(job)}...` : 'Starting...'}
+          </Title>
           <Text c="dimmed" size="sm">
             {job?.topic ?? 'Setting things up...'}
           </Text>
+          <Stack gap={6} w="100%">
+            <Progress
+              value={job ? progressPercent(job) : 0}
+              animated
+              aria-label="Generation progress"
+            />
+            {lessonText && (
+              <Text size="sm" c="dimmed">
+                {lessonText}
+              </Text>
+            )}
+          </Stack>
           <Text c="dimmed" size="xs">
-            This usually takes a minute or two. You can leave this page.
+            This usually takes a minute or two. You can leave this page: the
+            header shows progress, and a notification appears when the course is
+            ready.
           </Text>
         </Stack>
       </Paper>

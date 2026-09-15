@@ -82,6 +82,11 @@ class GenerationJob(Base):
     language: Mapped[str] = mapped_column(
         String, nullable=False, default="javascript", server_default="javascript"
     )
+    stage: Mapped[str | None] = mapped_column(String, nullable=True)
+    lessons_total: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    lessons_completed: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
       
     course_id: Mapped[str | None] = mapped_column(
         ForeignKey("courses.id", ondelete="SET NULL"), nullable=True

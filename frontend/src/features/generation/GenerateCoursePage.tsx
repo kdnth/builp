@@ -23,6 +23,7 @@ import {
   type GenerationMode,
 } from '../../lib/api'
 import { useAuthSession } from '../../lib/auth'
+import { watchGenerationJob } from './generationJobsStore'
 import type { CodeLanguage } from '../../types/codeLanguage'
 
 interface Placeholders {
@@ -89,6 +90,7 @@ export default function GenerateCoursePage() {
       }
 
       const job = await createGenerationJob(input)
+      watchGenerationJob(job)
       navigate(`/courses/generate/${job.id}`)
     } catch (err) {
       setError(

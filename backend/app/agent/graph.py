@@ -25,6 +25,7 @@ from langgraph.types import Command, Send
 from app.agent import nodes as default_nodes
 from app.agent.assemble import assemble_course, assemble_lesson
 from app.agent.llm import GenerationModelConfig, default_free_credit_model_config
+from app.agent.progress import NoopProgressReporter, ProgressReporter
 from app.agent.schemas import CourseOverview, LessonContent, UnitOutline, UnitSummary
 from app.agent.stage import StageOutcome
 from app.schemas.course import CodeLanguage, Course, Lesson
@@ -55,6 +56,7 @@ class GenerationState(TypedDict):
     lessons_per_unit: int
     language: CodeLanguage
     model_config: GenerationModelConfig
+    progress: ProgressReporter
     overview: CourseOverview
     overview_passed: bool
     unit_outlines: Annotated[list[UnitOutlineRecord], operator.add]
@@ -77,6 +79,7 @@ def build_graph(
             model_config=state["model_config"],
         )
         overview = outcome.content
+        state["progress"].stage("units")
         return Command(
             update={"overview": overview, "overview_passed": outcome.passed},
             goto=[
@@ -89,6 +92,7 @@ def build_graph(
                         "lessons_per_unit": state["lessons_per_unit"],
                         "language": state["language"],
                         "model_config": state["model_config"],
+                        "progress": state["progress"],
                     },
                 )
                 for index, unit in enumerate(overview.units)
@@ -104,6 +108,11 @@ def build_graph(
             model_config=payload["model_config"],
         )
         outline = outcome.content
+        progress: ProgressReporter = payload["progress"]
+        lesson_count_delta = len(outline.lessons) - payload["lessons_per_unit"]
+        if lesson_count_delta:
+            progress.adjust_lessons_total(lesson_count_delta)
+        progress.stage("lessons")
         record: UnitOutlineRecord = {
             "unit_index": payload["unit_index"],
             "unit": payload["unit"],
@@ -123,6 +132,7 @@ def build_graph(
                         "lesson_index": lesson_index,
                         "language": payload["language"],
                         "model_config": payload["model_config"],
+                        "progress": progress,
                     },
                 )
                 for lesson_index in range(len(outline.lessons))
@@ -140,6 +150,7 @@ def build_graph(
         )
         lesson_title = payload["outline"].lessons[payload["lesson_index"]].title
         lesson = assemble_lesson(lesson_title, outcome.content, payload["language"])
+        payload["progress"].lesson_completed()
         record: LessonRecord = {
             "unit_index": payload["unit_index"],
             "lesson_index": payload["lesson_index"],
@@ -149,6 +160,7 @@ def build_graph(
         return {"lesson_records": [record]}
 
     def node_assemble(state: GenerationState) -> dict:
+        state["progress"].stage("assembling")
         overview = state["overview"]
         by_unit: dict[int, list[LessonRecord]] = {
             index: [] for index in range(len(overview.units))
@@ -185,6 +197,7 @@ def run_generation(
     lessons_per_unit: int,
     language: CodeLanguage = "javascript",
     model_config: GenerationModelConfig | None = None,
+    progress: ProgressReporter | None = None,
     graph: CompiledStateGraph | None = None,
 ) -> Course:
     compiled = graph or build_graph()
@@ -196,6 +209,7 @@ def run_generation(
             "lessons_per_unit": lessons_per_unit,
             "language": language,
             "model_config": model_config or default_free_credit_model_config(),
+            "progress": progress or NoopProgressReporter(),
             "unit_outlines": [],
             "lesson_records": [],
         }

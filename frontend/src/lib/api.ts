@@ -302,6 +302,7 @@ export async function completeLesson(
 // --- Course generation ---------------------------------------------------
 
 export type GenerationJobStatus = 'pending' | 'running' | 'succeeded' | 'failed'
+export type GenerationStage = 'outline' | 'units' | 'lessons' | 'assembling'
 
 export interface GenerationJob {
   id: string
@@ -311,6 +312,9 @@ export interface GenerationJob {
   num_units: number
   lessons_per_unit: number
   language: CodeLanguage
+  stage: GenerationStage | null
+  lessons_total: number | null
+  lessons_completed: number
   course_id: string | null
   error: string | null
   created_at: string
@@ -348,6 +352,11 @@ export async function createGenerationJob(
     body: JSON.stringify(input),
   })
   return parseOrThrow(response, 'Could not start course generation.')
+}
+
+export async function listGenerationJobs(): Promise<GenerationJob[]> {
+  const response = await authorizedFetch('/api/generation-jobs')
+  return parseOrThrow(response, 'Could not load generation jobs.')
 }
 
 export async function getGenerationJob(jobId: string): Promise<GenerationJob> {

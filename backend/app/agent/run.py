@@ -9,6 +9,7 @@ succeeded | failed.
 
 from app.agent.graph import run_generation
 from app.agent.llm import GenerationModelConfig, default_free_credit_model_config
+from app.agent.progress import DatabaseProgressReporter
 from app.database import SessionLocal
 from app.models import Course as CourseModel
 from app.models import GenerationJob
@@ -34,6 +35,9 @@ def run_generation_job(
             return
 
         job.status = "running"
+        job.stage = "outline"
+        job.lessons_total = job.num_units * job.lessons_per_unit
+        job.lessons_completed = 0
         db.commit()
 
         try:
@@ -44,6 +48,7 @@ def run_generation_job(
                 lessons_per_unit=job.lessons_per_unit,
                 language=job.language,
                 model_config=active_model_config,
+                progress=DatabaseProgressReporter(job.id, SessionLocal),
             )
         except Exception as exc:
             # This is the top-level job boundary: every failure, model
