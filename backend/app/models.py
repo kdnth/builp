@@ -39,7 +39,7 @@ class SavedCourse(Base):
 
     __tablename__ = "saved_courses"
 
-    user_id: Mapped[str] = mapped_column(String, primary_key=True
+    user_id: Mapped[str] = mapped_column(String, primary_key=True)
                                          
     course_id: Mapped[str] = mapped_column(
         ForeignKey("courses.id", ondelete="CASCADE"), primary_key=True
