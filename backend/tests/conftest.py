@@ -7,7 +7,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.auth import AuthenticatedUser, get_current_user
+from app.auth import AuthenticatedUser, get_current_user, get_current_user_optional
 from app.database import Base, get_db
 from app.main import app
 
@@ -61,6 +61,12 @@ def db_session() -> Iterator[Session]:
 def client(current_user: AuthenticatedUser) -> Iterator[TestClient]:
     app.dependency_overrides[get_db] = _override_get_db
     app.dependency_overrides[get_current_user] = lambda: current_user
+    # get_current_user_optional never goes through get_current_user's
+    # override (it calls the real function directly to fall back to
+    # anonymous on failure), so it needs its own override to default tests
+    # to "signed in as current_user" the same way the rest of the fixture
+    # does. A test that needs an anonymous viewer overrides this locally.
+    app.dependency_overrides[get_current_user_optional] = lambda: current_user
     with TestClient(app) as test_client:
         yield test_client
     app.dependency_overrides.clear()

@@ -17,17 +17,36 @@ class Course(Base):
     title: Mapped[str] = mapped_column(String, nullable=False)
     data: Mapped[dict] = mapped_column(JSON, nullable=False)
     owner_user_id: Mapped[str | None] = mapped_column(String, nullable=True)
-    # DB-side metadata, deliberately not part of the course JSON content
-    # (data above). A course uploaded or generated before tags existed
-    # just gets the column default: [], no backfill needed.
     tags: Mapped[list[str]] = mapped_column(
         JSON, nullable=False, default=list, server_default="[]"
+    )
+    forked_from_id: Mapped[str | None] = mapped_column(
+        ForeignKey("courses.id", ondelete="SET NULL"), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
+    )
+
+
+class SavedCourse(Base):
+    """A course bookmarked into a user's "My Courses" list without owning
+    it. Membership in My Courses is owner_user_id == user OR a row here -
+    an author's own courses are never rowed here (see save_course), since
+    ownership alone already guarantees membership."""
+
+    __tablename__ = "saved_courses"
+
+    user_id: Mapped[str] = mapped_column(String, primary_key=True)
+    # The saved course disappearing entirely removes any reason to keep
+    # the bookmark - nothing left to show for it.
+    course_id: Mapped[str] = mapped_column(
+        ForeignKey("courses.id", ondelete="CASCADE"), primary_key=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
     )
 
 
@@ -41,8 +60,6 @@ class LessonProgress(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
-    # A deleted course's progress rows have no further purpose - nothing
-    # reads progress for a course that no longer exists - so this cascades.
     course_id: Mapped[str] = mapped_column(
         ForeignKey("courses.id", ondelete="CASCADE"), nullable=False
     )
@@ -63,10 +80,6 @@ class GenerationJob(Base):
     audience: Mapped[str] = mapped_column(String, nullable=False)
     num_units: Mapped[int] = mapped_column(Integer, nullable=False)
     lessons_per_unit: Mapped[int] = mapped_column(Integer, nullable=False)
-    # Detached, not cascaded, on course deletion: this row is the record
-    # that the generation happened at all (it backs the free-credit rate
-    # limit, which must survive the course being deleted), so it outlives
-    # the course. Only the link to the now-gone course is cleared.
     course_id: Mapped[str | None] = mapped_column(
         ForeignKey("courses.id", ondelete="SET NULL"), nullable=True
     )

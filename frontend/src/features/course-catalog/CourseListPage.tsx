@@ -11,15 +11,19 @@ import {
   Group,
   List,
   Modal,
+  Pagination,
   Progress,
   SimpleGrid,
+  Skeleton,
   Stack,
   Text,
   TextInput,
   Title,
+  Tooltip,
 } from '@mantine/core'
 import { Link } from 'react-router-dom'
 import {
+  BookmarkSimpleIcon,
   DownloadIcon,
   GraduationCapIcon,
   MagicWandIcon,
@@ -34,24 +38,32 @@ import {
   ApiError,
   deleteCourse,
   getCourseFromApi,
+  saveCourse,
+  unsaveCourse,
   type CourseSummary,
 } from '../../lib/api'
 import { downloadCourseJson } from '../../lib/downloadCourseJson'
 import { useCourses } from '../../hooks/useCourses'
 import { useCourseProgress } from '../../hooks/useCourseProgress'
+import { useAuthSession } from '../../lib/auth'
 import { hasCompletedTour, useTour, type TourStep } from '../tour/TourContext'
 
 type DeleteStep = 'closed' | 'confirm' | 'download-prompt'
 
 function CourseCard({
   course,
+  currentUserId,
+  showSaveButton,
   onTagClick,
   onDeleted,
 }: {
   course: CourseSummary
+  currentUserId: string | undefined
+  showSaveButton: boolean
   onTagClick: (tag: string) => void
   onDeleted: () => void
 }) {
+  const isOwner = course.owner_user_id === currentUserId
   const { completedLessonIds } = useCourseProgress(course.id)
   const completed = completedLessonIds.size
   const total = course.lesson_count
@@ -59,6 +71,33 @@ function CourseCard({
   const [issues, setIssues] = useState<string[] | null>(null)
   const [deleteStep, setDeleteStep] = useState<DeleteStep>('closed')
   const [working, setWorking] = useState(false)
+  const [saved, setSaved] = useState(course.saved)
+  const [saveWorking, setSaveWorking] = useState(false)
+
+  useEffect(() => {
+    setSaved(course.saved)
+  }, [course.saved])
+
+  async function handleToggleSave() {
+    setSaveWorking(true)
+    try {
+      if (saved) {
+        await unsaveCourse(course.id)
+        setSaved(false)
+      } else {
+        await saveCourse(course.id)
+        setSaved(true)
+      }
+    } catch (err) {
+      setIssues([
+        err instanceof ApiError
+          ? err.message
+          : 'Could not update saved status.',
+      ])
+    } finally {
+      setSaveWorking(false)
+    }
+  }
 
   async function handleDelete(options: { download: boolean }) {
     setIssues(null)
@@ -119,16 +158,43 @@ function CourseCard({
             {completed}/{total} lessons complete
           </Text>
         </Stack>
-        <Group justify="end">
-          <ActionIcon
-            variant="transparent"
-            aria-label="Delete Course"
-            onClick={() => setDeleteStep('confirm')}
-            color="gray"
-          >
-            <TrashIcon size={20} />
-          </ActionIcon>
-        </Group>
+        {(showSaveButton || isOwner) && (
+          <Group justify="end" gap="xs">
+            {showSaveButton && isOwner && (
+              <Tooltip label="You own this course">
+                <ActionIcon variant="transparent" color="gray" disabled>
+                  <BookmarkSimpleIcon size={20} weight="fill" />
+                </ActionIcon>
+              </Tooltip>
+            )}
+            {showSaveButton && !isOwner && (
+              <ActionIcon
+                variant="transparent"
+                color="gray"
+                aria-label={
+                  saved ? 'Remove from My Courses' : 'Save to My Courses'
+                }
+                onClick={() => void handleToggleSave()}
+                disabled={saveWorking}
+              >
+                <BookmarkSimpleIcon
+                  size={20}
+                  weight={saved ? 'fill' : 'regular'}
+                />
+              </ActionIcon>
+            )}
+            {isOwner && (
+              <ActionIcon
+                variant="transparent"
+                aria-label="Delete Course"
+                onClick={() => setDeleteStep('confirm')}
+                color="gray"
+              >
+                <TrashIcon size={20} />
+              </ActionIcon>
+            )}
+          </Group>
+        )}
         {issues && (
           <Alert
             color="red"
@@ -211,6 +277,22 @@ function CourseCard({
   )
 }
 
+function CourseCardSkeleton() {
+  return (
+    <Card withBorder radius="md" p="lg">
+      <Stack gap="sm">
+        <Group gap="xs">
+          <Skeleton height={20} width={20} circle />
+          <Skeleton height={20} width="60%" />
+        </Group>
+        <Skeleton height={14} width="40%" />
+        <Skeleton height={8} radius="xl" />
+        <Skeleton height={12} width="30%" />
+      </Stack>
+    </Card>
+  )
+}
+
 const COURSE_LIST_TOUR_ID = 'course-list'
 
 const courseListTourSteps: TourStep[] = [
@@ -244,55 +326,81 @@ const courseListTourSteps: TourStep[] = [
   },
 ]
 
-export default function CourseListPage() {
+const PAGE_SIZE = 24
+
+export function CourseCatalog({ scope }: { scope: 'mine' | 'explore' }) {
   const [searchInput, setSearchInput] = useState('')
   const [q, setQ] = useState('')
   const [tag, setTag] = useState<string | null>(null)
-  const { courses, loading, refetch } = useCourses({ q, tag: tag ?? undefined })
+  const [page, setPage] = useState(1)
+  const session = useAuthSession()
+  const userId = session.data?.user.id
+  const { courses, total, loading, refetch } = useCourses({
+    q,
+    tag: tag ?? undefined,
+    forUserId: scope === 'mine' ? userId : undefined,
+    limit: PAGE_SIZE,
+    offset: (page - 1) * PAGE_SIZE,
+  })
   const { start } = useTour()
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   useEffect(() => {
-    if (!loading && !hasCompletedTour(COURSE_LIST_TOUR_ID)) {
+    if (
+      scope === 'mine' &&
+      !loading &&
+      !hasCompletedTour(COURSE_LIST_TOUR_ID)
+    ) {
       start(COURSE_LIST_TOUR_ID, courseListTourSteps)
     }
-  }, [loading, start])
+  }, [scope, loading, start])
 
   useEffect(() => {
     const timeout = setTimeout(() => setQ(searchInput), 300)
     return () => clearTimeout(timeout)
   }, [searchInput])
 
+  useEffect(() => {
+    setPage(1)
+  }, [q, tag, scope])
+
   return (
     <Container size="lg" py="xl">
       <Stack gap="lg">
         <Group justify="space-between" align="center">
-          <Title order={1}>Courses</Title>
+          <Title order={1}>{scope === 'mine' ? 'My Courses' : 'Explore'}</Title>
           <Group gap="sm">
-            <ActionIcon
-              variant="light"
-              radius="xl"
-              size="lg"
-              onClick={() => start(COURSE_LIST_TOUR_ID, courseListTourSteps)}
-            >
-              <QuestionIcon size={20} />
-            </ActionIcon>
-            <Button
-              data-tour="course-generate"
-              component={Link}
-              to="/courses/generate"
-              leftSection={<MagicWandIcon size={16} />}
-            >
-              Generate Course
-            </Button>
-            <Button
-              data-tour="course-upload"
-              component={Link}
-              to="/courses/new"
-              variant="default"
-              leftSection={<UploadIcon size={16} />}
-            >
-              Upload Course
-            </Button>
+            {scope === 'mine' && (
+              <ActionIcon
+                variant="light"
+                radius="xl"
+                size="lg"
+                onClick={() => start(COURSE_LIST_TOUR_ID, courseListTourSteps)}
+              >
+                <QuestionIcon size={20} />
+              </ActionIcon>
+            )}
+            {scope === 'mine' && (
+              <>
+                <Button
+                  data-tour="course-generate"
+                  component={Link}
+                  to="/courses/generate"
+                  leftSection={<MagicWandIcon size={16} />}
+                >
+                  Generate Course
+                </Button>
+                <Button
+                  data-tour="course-upload"
+                  component={Link}
+                  to="/courses/new"
+                  variant="default"
+                  leftSection={<UploadIcon size={16} />}
+                >
+                  Upload Course
+                </Button>
+              </>
+            )}
           </Group>
         </Group>
 
@@ -323,25 +431,49 @@ export default function CourseListPage() {
         </Group>
 
         <div data-tour="course-grid">
+          {loading && (
+            <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }}>
+              {Array.from({ length: 6 }, (_, idx) => (
+                <CourseCardSkeleton key={idx} />
+              ))}
+            </SimpleGrid>
+          )}
+
           {!loading && courses.length === 0 && (
             <Text c="dimmed" size="sm">
-              No courses found.
+              {scope === 'mine'
+                ? 'No courses found. Upload or generate one to get started.'
+                : 'No courses found.'}
             </Text>
           )}
 
-          <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }}>
-            {courses.map((course) => (
-              <CourseCard
-                data-tour="course-detail"
-                key={course.id}
-                course={course}
-                onTagClick={setTag}
-                onDeleted={refetch}
-              />
-            ))}
-          </SimpleGrid>
+          {!loading && courses.length > 0 && (
+            <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }}>
+              {courses.map((course) => (
+                <CourseCard
+                  data-tour="course-detail"
+                  key={course.id}
+                  course={course}
+                  currentUserId={userId}
+                  showSaveButton={scope === 'explore'}
+                  onTagClick={setTag}
+                  onDeleted={refetch}
+                />
+              ))}
+            </SimpleGrid>
+          )}
         </div>
+
+        {!loading && pageCount > 1 && (
+          <Group justify="center">
+            <Pagination value={page} onChange={setPage} total={pageCount} />
+          </Group>
+        )}
       </Stack>
     </Container>
   )
+}
+
+export default function CourseListPage() {
+  return <CourseCatalog scope="mine" />
 }

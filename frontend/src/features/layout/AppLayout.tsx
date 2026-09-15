@@ -8,8 +8,14 @@ import {
   Title,
   useMantineColorScheme,
   useComputedColorScheme,
+  Text,
 } from '@mantine/core'
-import { MoonIcon, SunIcon } from '@phosphor-icons/react'
+import {
+  BookBookmarkIcon,
+  CompassIcon,
+  MoonIcon,
+  SunIcon,
+} from '@phosphor-icons/react'
 import AuthStatus from './AuthStatus'
 import logo from '../../assets/logo.png'
 
@@ -42,12 +48,33 @@ export default function AppLayout() {
     <AppShell header={{ height: 60 }} padding={0}>
       <AppShell.Header>
         <Group h="100%" px="md" justify="space-between">
-          <Anchor component={Link} to="/" underline="never" c="inherit">
-            <Group gap="xs">
-              <Image src={logo} w={48} h={48} fit="contain" />
-              <Title order={2}>builp</Title>
+          <Group gap={'lg'}>
+            <Anchor component={Link} to="/" underline="never" c="inherit">
+              <Group gap="xs">
+                <Image src={logo} w={48} h={48} fit="contain" />
+                <Title order={2}>builp</Title>
+              </Group>
+            </Anchor>
+            <Group gap={'md'}>
+              <Anchor
+                component={Link}
+                to="/explore"
+                underline="never"
+                c="dimmed"
+              >
+                <Group gap={'xs'}>
+                  <CompassIcon size={16} />
+                  <Text>Explore</Text>
+                </Group>
+              </Anchor>
+              <Anchor component={Link} to="/" underline="never" c="dimmed">
+                <Group gap={'xs'}>
+                  <BookBookmarkIcon size={16} />
+                  <Text>My Courses</Text>
+                </Group>
+              </Anchor>
             </Group>
-          </Anchor>
+          </Group>
           <Group gap="sm">
             <AuthStatus />
             <ColorSchemeToggle />

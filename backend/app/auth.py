@@ -19,11 +19,6 @@ def _jwks_url(settings: Settings) -> str:
     if settings.neon_auth_jwks_url:
         return settings.neon_auth_jwks_url
     if settings.neon_auth_url:
-        # Confirmed against a real Neon Auth project: the JWKS document is
-        # at /.well-known/jwks.json under the same base URL the frontend
-        # uses (VITE_NEON_AUTH_URL), not Better Auth's own default /jwks
-        # path. Set NEON_AUTH_JWKS_URL directly instead if this ever
-        # changes.
         return f"{settings.neon_auth_url.rstrip('/')}/.well-known/jwks.json"
     raise RuntimeError("Neon Auth is not configured.")
 
@@ -82,3 +77,16 @@ def get_current_user(
         )
 
     return AuthenticatedUser(id=user_id, email=payload.get("email"))
+
+
+def get_current_user_optional(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
+    settings: Settings = Depends(get_settings),
+) -> AuthenticatedUser | None:
+    """Like get_current_user, but for endpoints anonymous visitors can still
+    use (e.g. browsing courses) - a missing, invalid, or unconfigured token
+    means "anonymous", not an error."""
+    try:
+        return get_current_user(credentials, settings)
+    except HTTPException:
+        return None
