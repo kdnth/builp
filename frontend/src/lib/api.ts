@@ -206,6 +206,7 @@ export interface PaginatedCourses {
 export type CourseDetail = Course & {
   tags: string[]
   owner_user_id: string | null
+  saved: boolean
 }
 
 export async function listCourses(params?: {

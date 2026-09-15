@@ -1,12 +1,13 @@
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status, Response
-from sqlalchemy import func, or_, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.auth import AuthenticatedUser, get_current_user, get_current_user_optional
 from app.database import get_db
 from app.models import Course as CourseModel
+from app.models import LessonProgress as LessonProgressModel
 from app.models import SavedCourse as SavedCourseModel
 from app.schemas.course import (
     Course,
@@ -27,6 +28,20 @@ def _saved_course_ids(db: Session, user_id: str) -> set[str]:
                 SavedCourseModel.user_id == user_id
             )
         )
+    )
+
+
+def is_course_saved_by(db: Session, row: CourseModel, user_id: str) -> bool:
+    if row.owner_user_id == user_id:
+        return True
+    return (
+        db.scalar(
+            select(SavedCourseModel).where(
+                SavedCourseModel.user_id == user_id,
+                SavedCourseModel.course_id == row.id,
+            )
+        )
+        is not None
     )
 
 
@@ -86,14 +101,24 @@ def list_courses(
 
 
 @router.get("/{course_id}", response_model=CourseDetail)
-def get_course(course_id: str, db: Session = Depends(get_db)) -> CourseDetail:
+def get_course(
+    course_id: str,
+    db: Session = Depends(get_db),
+    current_user: AuthenticatedUser | None = Depends(get_current_user_optional),
+) -> CourseDetail:
     row = db.get(CourseModel, course_id)
     if row is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Course not found."
         )
+    saved = current_user is not None and is_course_saved_by(db, row, current_user.id)
     return CourseDetail.model_validate(
-        {**row.data, "tags": row.tags, "owner_user_id": row.owner_user_id}
+        {
+            **row.data,
+            "tags": row.tags,
+            "owner_user_id": row.owner_user_id,
+            "saved": saved,
+        }
     )
 
 
@@ -124,7 +149,7 @@ def create_course(
     db.add(row)
     db.commit()
     return CourseDetail.model_validate(
-        {**content, "tags": [], "owner_user_id": user.id}
+        {**content, "tags": [], "owner_user_id": user.id, "saved": True}
     )
 
 
@@ -212,7 +237,13 @@ def unsave_course(
     )
     if existing is not None:
         db.delete(existing)
-        db.commit()
+    db.execute(
+        delete(LessonProgressModel).where(
+            LessonProgressModel.user_id == user.id,
+            LessonProgressModel.course_id == course_id,
+        )
+    )
+    db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

@@ -70,5 +70,10 @@ export function useCourseProgress(courseId: string) {
     [courseId, isSignedIn],
   )
 
-  return { completedLessonIds, markLessonComplete, isSignedIn }
+  const resetProgress = useCallback(() => {
+    setCompletedLessonIds(new Set())
+    syncedLessonIds.current = new Set()
+  }, [])
+
+  return { completedLessonIds, markLessonComplete, resetProgress, isSignedIn }
 }

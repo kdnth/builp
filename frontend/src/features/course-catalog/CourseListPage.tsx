@@ -47,6 +47,7 @@ import { useCourses } from '../../hooks/useCourses'
 import { useCourseProgress } from '../../hooks/useCourseProgress'
 import { useAuthSession } from '../../lib/auth'
 import { hasCompletedTour, useTour, type TourStep } from '../tour/TourContext'
+import UnsaveCourseModal from './UnsaveCourseModal'
 
 type DeleteStep = 'closed' | 'confirm' | 'download-prompt'
 
@@ -64,7 +65,7 @@ function CourseCard({
   onDeleted: () => void
 }) {
   const isOwner = course.owner_user_id === currentUserId
-  const { completedLessonIds } = useCourseProgress(course.id)
+  const { completedLessonIds, resetProgress } = useCourseProgress(course.id)
   const completed = completedLessonIds.size
   const total = course.lesson_count
   const percent = total === 0 ? 0 : Math.round((completed / total) * 100)
@@ -73,6 +74,7 @@ function CourseCard({
   const [working, setWorking] = useState(false)
   const [saved, setSaved] = useState(course.saved)
   const [saveWorking, setSaveWorking] = useState(false)
+  const [unsaveConfirmOpen, setUnsaveConfirmOpen] = useState(false)
 
   useEffect(() => {
     setSaved(course.saved)
@@ -84,11 +86,14 @@ function CourseCard({
       if (saved) {
         await unsaveCourse(course.id)
         setSaved(false)
+        setUnsaveConfirmOpen(false)
+        resetProgress()
       } else {
         await saveCourse(course.id)
         setSaved(true)
       }
     } catch (err) {
+      setUnsaveConfirmOpen(false)
       setIssues([
         err instanceof ApiError
           ? err.message
@@ -171,10 +176,10 @@ function CourseCard({
               <ActionIcon
                 variant="transparent"
                 color="gray"
-                aria-label={
-                  saved ? 'Remove from My Courses' : 'Save to My Courses'
+                aria-label={saved ? 'Remove' : 'Save'}
+                onClick={() =>
+                  saved ? setUnsaveConfirmOpen(true) : void handleToggleSave()
                 }
-                onClick={() => void handleToggleSave()}
                 disabled={saveWorking}
               >
                 <BookmarkSimpleIcon
@@ -211,6 +216,14 @@ function CourseCard({
           </Alert>
         )}
       </Stack>
+
+      <UnsaveCourseModal
+        opened={unsaveConfirmOpen}
+        courseTitle={course.title}
+        working={saveWorking}
+        onCancel={() => setUnsaveConfirmOpen(false)}
+        onConfirm={() => void handleToggleSave()}
+      />
 
       <Modal
         opened={deleteStep === 'confirm'}
@@ -371,16 +384,6 @@ export function CourseCatalog({ scope }: { scope: 'mine' | 'explore' }) {
           <Title order={1}>{scope === 'mine' ? 'My Courses' : 'Explore'}</Title>
           <Group gap="sm">
             {scope === 'mine' && (
-              <ActionIcon
-                variant="light"
-                radius="xl"
-                size="lg"
-                onClick={() => start(COURSE_LIST_TOUR_ID, courseListTourSteps)}
-              >
-                <QuestionIcon size={20} />
-              </ActionIcon>
-            )}
-            {scope === 'mine' && (
               <>
                 <Button
                   data-tour="course-generate"
@@ -399,6 +402,16 @@ export function CourseCatalog({ scope }: { scope: 'mine' | 'explore' }) {
                 >
                   Upload Course
                 </Button>
+                <ActionIcon
+                  variant="light"
+                  radius="xl"
+                  size="lg"
+                  onClick={() =>
+                    start(COURSE_LIST_TOUR_ID, courseListTourSteps)
+                  }
+                >
+                  <QuestionIcon size={20} />
+                </ActionIcon>
               </>
             )}
           </Group>

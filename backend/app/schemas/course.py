@@ -162,6 +162,7 @@ class CourseDetail(Course):
 
     tags: list[str] = []
     owner_user_id: str | None = None
+    saved: bool = False
 
 
 class UpdateTagsRequest(BaseModel):
