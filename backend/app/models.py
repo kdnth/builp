@@ -39,9 +39,8 @@ class SavedCourse(Base):
 
     __tablename__ = "saved_courses"
 
-    user_id: Mapped[str] = mapped_column(String, primary_key=True)
-    # The saved course disappearing entirely removes any reason to keep
-    # the bookmark - nothing left to show for it.
+    user_id: Mapped[str] = mapped_column(String, primary_key=True
+                                         
     course_id: Mapped[str] = mapped_column(
         ForeignKey("courses.id", ondelete="CASCADE"), primary_key=True
     )
@@ -74,12 +73,13 @@ class GenerationJob(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     owner_user_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
-    # pending -> running -> succeeded | failed
+    
     status: Mapped[str] = mapped_column(String, nullable=False, default="pending")
     topic: Mapped[str] = mapped_column(String, nullable=False)
     audience: Mapped[str] = mapped_column(String, nullable=False)
     num_units: Mapped[int] = mapped_column(Integer, nullable=False)
     lessons_per_unit: Mapped[int] = mapped_column(Integer, nullable=False)
+      
     course_id: Mapped[str | None] = mapped_column(
         ForeignKey("courses.id", ondelete="SET NULL"), nullable=True
     )
