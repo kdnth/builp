@@ -2,6 +2,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from app.agent.llm import GenerationModelConfig, default_free_credit_model_config
@@ -18,6 +19,28 @@ router = APIRouter(prefix="/api/generation-jobs", tags=["generation"])
 # request per rolling 24h window per user (regardless of success/failure)
 # to prevent retry loops from becoming unbounded cost.
 _RATE_LIMIT_WINDOW = timedelta(hours=24)
+
+_RECENT_JOBS_WINDOW = timedelta(hours=24)
+_RECENT_JOBS_LIMIT = 20
+
+_STALE_JOB_AFTER = timedelta(minutes=15)
+_STALE_JOB_ERROR = (
+    "Generation stopped unexpectedly, probably because the server restarted. "
+    "Try again."
+)
+
+
+def _fail_stale_jobs(*, db: Session, user: AuthenticatedUser) -> None:
+    db.execute(
+        update(GenerationJob)
+        .where(
+            GenerationJob.owner_user_id == user.id,
+            GenerationJob.status.in_(["pending", "running"]),
+            GenerationJob.updated_at < datetime.now(UTC) - _STALE_JOB_AFTER,
+        )
+        .values(status="failed", error=_STALE_JOB_ERROR)
+    )
+    db.commit()
 
 
 def _enforce_free_credit_rate_limit(*, db: Session, user: AuthenticatedUser) -> None:
@@ -115,12 +138,31 @@ def create_generation_job(
     return job
 
 
+@router.get("", response_model=list[GenerationJobResponse])
+def list_generation_jobs(
+    db: Session = Depends(get_db),
+    user: AuthenticatedUser = Depends(get_current_user),
+) -> list[GenerationJob]:
+    _fail_stale_jobs(db=db, user=user)
+    return (
+        db.query(GenerationJob)
+        .filter(
+            GenerationJob.owner_user_id == user.id,
+            GenerationJob.created_at >= datetime.now(UTC) - _RECENT_JOBS_WINDOW,
+        )
+        .order_by(GenerationJob.created_at.desc())
+        .limit(_RECENT_JOBS_LIMIT)
+        .all()
+    )
+
+
 @router.get("/{job_id}", response_model=GenerationJobResponse)
 def get_generation_job(
     job_id: str,
     db: Session = Depends(get_db),
     user: AuthenticatedUser = Depends(get_current_user),
 ) -> GenerationJob:
+    _fail_stale_jobs(db=db, user=user)
     job = db.get(GenerationJob, job_id)
     if job is None or job.owner_user_id != user.id:
         raise HTTPException(

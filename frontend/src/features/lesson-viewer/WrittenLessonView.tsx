@@ -1,4 +1,5 @@
 import Markdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import type { WrittenLesson } from '../../types/writtenLesson'
 import { Paper, Typography } from '@mantine/core'
 
@@ -10,7 +11,7 @@ export default function WrittenLessonView({ view }: WrittenLessonViewProps) {
   return (
     <Paper withBorder radius="md" p="lg" shadow="sm">
       <Typography>
-        <Markdown>{view.markdown}</Markdown>
+        <Markdown remarkPlugins={[remarkGfm]}>{view.markdown}</Markdown>
       </Typography>
     </Paper>
   )

@@ -75,6 +75,88 @@ def test_create_generation_job_rejects_unknown_language(client):
     run_job.assert_not_called()
 
 
+def test_list_generation_jobs_returns_recent_own_jobs_newest_first(client, db_session):
+    now = datetime.now(UTC)
+    for job_id, owner, age in [
+        ("old", "user-1", timedelta(hours=1)),
+        ("new", "user-1", timedelta(minutes=1)),
+        ("expired", "user-1", timedelta(hours=30)),
+        ("other-user", "user-2", timedelta(minutes=1)),
+    ]:
+        db_session.add(
+            GenerationJob(
+                id=job_id,
+                owner_user_id=owner,
+                status="succeeded",
+                topic=job_id,
+                audience="a",
+                num_units=1,
+                lessons_per_unit=1,
+                created_at=now - age,
+                updated_at=now - age,
+            )
+        )
+    db_session.commit()
+
+    response = client.get("/api/generation-jobs")
+
+    assert response.status_code == 200
+    jobs = response.json()
+    assert [job["id"] for job in jobs] == ["new", "old"]
+    assert jobs[0]["stage"] is None
+    assert jobs[0]["lessons_total"] is None
+    assert jobs[0]["lessons_completed"] == 0
+
+
+def test_job_progress_fields_are_returned(client, db_session):
+    with patch("app.routers.generation.run_generation_job"):
+        job_id = client.post(
+            "/api/generation-jobs", json=_base_generation_payload()
+        ).json()["id"]
+    job = db_session.get(GenerationJob, job_id)
+    job.status = "running"
+    job.stage = "lessons"
+    job.lessons_total = 4
+    job.lessons_completed = 3
+    db_session.commit()
+
+    body = client.get(f"/api/generation-jobs/{job_id}").json()
+    assert body["stage"] == "lessons"
+    assert body["lessons_total"] == 4
+    assert body["lessons_completed"] == 3
+
+
+def test_stale_running_job_is_marked_failed(client, db_session):
+    now = datetime.now(UTC)
+    for job_id, updated_ago in [
+        ("stale", timedelta(minutes=20)),
+        ("live", timedelta(minutes=2)),
+    ]:
+        db_session.add(
+            GenerationJob(
+                id=job_id,
+                owner_user_id="user-1",
+                status="running",
+                topic=job_id,
+                audience="a",
+                num_units=1,
+                lessons_per_unit=1,
+                created_at=now - timedelta(minutes=30),
+                updated_at=now - updated_ago,
+            )
+        )
+    db_session.commit()
+
+    stale = client.get("/api/generation-jobs/stale").json()
+    assert stale["status"] == "failed"
+    assert "server restarted" in stale["error"]
+
+    listed = {
+        job["id"]: job["status"] for job in client.get("/api/generation-jobs").json()
+    }
+    assert listed == {"stale": "failed", "live": "running"}
+
+
 def test_get_generation_job_not_found(client):
     response = client.get("/api/generation-jobs/does-not-exist")
     assert response.status_code == 404

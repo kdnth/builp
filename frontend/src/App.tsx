@@ -1,4 +1,5 @@
 import '@mantine/core/styles.css'
+import '@mantine/notifications/styles.css'
 import { createTheme, MantineProvider, virtualColor } from '@mantine/core'
 import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom'
 import AppLayout from './features/layout/AppLayout'

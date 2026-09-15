@@ -14,6 +14,7 @@ import {
   Text,
 } from '@mantine/core'
 import { useDisclosure } from '@mantine/hooks'
+import { Notifications } from '@mantine/notifications'
 import {
   BookBookmarkIcon,
   CompassIcon,
@@ -21,6 +22,8 @@ import {
   SunIcon,
 } from '@phosphor-icons/react'
 import AuthStatus from './AuthStatus'
+import GenerationJobIndicator from '../generation/GenerationJobIndicator'
+import GenerationJobsWatcher from '../generation/GenerationJobsWatcher'
 import logo from '../../assets/logo.png'
 
 const navItems = [
@@ -106,6 +109,7 @@ export default function AppLayout() {
             </Group>
           </Group>
           <Group gap="sm" wrap="nowrap">
+            <GenerationJobIndicator />
             <Box visibleFrom="sm">
               <AuthStatus />
             </Box>
@@ -132,6 +136,8 @@ export default function AppLayout() {
       <AppShell.Main>
         <Outlet />
       </AppShell.Main>
+      <GenerationJobsWatcher />
+      <Notifications position="bottom-right" />
     </AppShell>
   )
 }

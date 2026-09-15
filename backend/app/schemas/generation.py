@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, SecretStr
 from app.schemas.course import CodeLanguage
 
 JobStatus = Literal["pending", "running", "succeeded", "failed"]
+GenerationStage = Literal["outline", "units", "lessons", "assembling"]
 GenerationMode = Literal["free_credit", "provider_api_key"]
 SupportedProvider = Literal["anthropic"]
 
@@ -31,6 +32,9 @@ class GenerationJobResponse(BaseModel):
     num_units: int
     lessons_per_unit: int
     language: CodeLanguage
+    stage: GenerationStage | None
+    lessons_total: int | None
+    lessons_completed: int
     course_id: str | None
     error: str | None
     created_at: datetime
