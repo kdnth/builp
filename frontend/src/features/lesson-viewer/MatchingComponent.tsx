@@ -21,6 +21,13 @@ interface Tile {
   label: string
 }
 
+const tileLabelStyle: React.CSSProperties = {
+  minWidth: 0,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+}
+
 interface Match {
   termId: string | null
   definitionId: string | null
@@ -159,6 +166,11 @@ export default function MatchingComponent({
                 <Button
                   key={t.id}
                   value={t.id}
+                  title={t.label}
+                  fullWidth
+                  h={44}
+                  justify="flex-start"
+                  styles={{ inner: { minWidth: 0 }, label: tileLabelStyle }}
                   onClick={handleTermTileClick}
                   variant={
                     matchedPairIds.has(t.id)
@@ -190,6 +202,11 @@ export default function MatchingComponent({
                 <Button
                   key={t.id}
                   value={t.id}
+                  title={t.label}
+                  fullWidth
+                  h={44}
+                  justify="flex-start"
+                  styles={{ inner: { minWidth: 0 }, label: tileLabelStyle }}
                   onClick={handleDefinitionTileClick}
                   variant={
                     matchedPairIds.has(t.id)
