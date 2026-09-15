@@ -81,11 +81,17 @@ function App() {
                 path="/courses/generate/:jobId"
                 element={<GenerationJobPage />}
               />
-              <Route path="/courses/:courseId" element={<CourseTreePage />} />
               <Route
-                path="/courses/:courseId/units/:unitId"
-                element={<UnitPage />}
-              />
+                path="/courses/:courseId"
+                element={
+                  <CourseProgressProvider>
+                    <Outlet />
+                  </CourseProgressProvider>
+                }
+              >
+                <Route index element={<CourseTreePage />} />
+                <Route path="units/:unitId" element={<UnitPage />} />
+              </Route>
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Routes>

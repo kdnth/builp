@@ -112,7 +112,7 @@ export default function CourseTreePage() {
   const { courseId } = useParams<{ courseId: string }>()
   const { course, setCourse, loading, notFound } = useCourse(courseId)
   const session = useAuthSession()
-  const { completedLessonIds } = useCourseProgress(courseId ?? '')
+  const { completedLessonIds } = useCourseProgressContext()
   const { start } = useTour()
 
   useEffect(() => {
