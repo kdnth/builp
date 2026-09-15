@@ -1,11 +1,14 @@
 import { useComputedColorScheme } from '@mantine/core'
 import { indentWithTab } from '@codemirror/commands'
+import { lintGutter } from '@codemirror/lint'
 import { Compartment, EditorState } from '@codemirror/state'
 import { EditorView, keymap } from '@codemirror/view'
 import { basicSetup } from 'codemirror'
 import { useEffect, useRef } from 'react'
+import type { LineDiagnostic } from '../code-runner/types'
 import type { CodeLanguage } from '../../types/codeLanguage'
 import { languageExtensions } from './languages'
+import { runDiagnosticsField, showRunDiagnostics } from './syntaxDiagnostics'
 import { editorTheme } from './theme'
 
 // Compartments are keys, not state, so all editors can share them.
@@ -17,11 +20,14 @@ function readOnlyExtensions(readOnly: boolean) {
   return [EditorState.readOnly.of(readOnly), EditorView.editable.of(!readOnly)]
 }
 
+const NO_DIAGNOSTICS: LineDiagnostic[] = []
+
 interface CodeEditorProps {
   value: string
   onChange: (value: string) => void
   language: CodeLanguage
   readOnly?: boolean
+  diagnostics?: LineDiagnostic[]
 }
 
 export default function CodeEditor({
@@ -29,6 +35,7 @@ export default function CodeEditor({
   onChange,
   language,
   readOnly = false,
+  diagnostics = NO_DIAGNOSTICS,
 }: CodeEditorProps) {
   const colorScheme = useComputedColorScheme('light')
   const containerRef = useRef<HTMLDivElement>(null)
@@ -50,6 +57,8 @@ export default function CodeEditor({
         extensions: [
           basicSetup,
           keymap.of([indentWithTab]),
+          lintGutter(),
+          runDiagnosticsField,
           languageCompartment.of(languageExtensions(initial.language)),
           themeCompartment.of(editorTheme(initial.colorScheme)),
           readOnlyCompartment.of(readOnlyExtensions(initial.readOnly)),
@@ -94,6 +103,10 @@ export default function CodeEditor({
       view.dispatch({ changes: { from: 0, to: current.length, insert: value } })
     }
   }, [value])
+
+  useEffect(() => {
+    if (viewRef.current) showRunDiagnostics(viewRef.current, diagnostics)
+  }, [diagnostics])
 
   return <div ref={containerRef} />
 }

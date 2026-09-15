@@ -10,7 +10,7 @@ export function toTestResult(
   raw: RawTestResult,
 ): FunctionTestResult {
   if (raw.error !== undefined) {
-    return { testCase, passed: false, error: raw.error }
+    return { testCase, passed: false, error: raw.error, line: raw.line }
   }
   const actualOutput =
     raw.outputJson === undefined ? undefined : JSON.parse(raw.outputJson)

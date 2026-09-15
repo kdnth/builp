@@ -1,7 +1,11 @@
-import { Badge, Button, Group, Paper, Stack, Text } from '@mantine/core'
+import { Alert, Badge, Button, Group, Paper, Stack, Text } from '@mantine/core'
 import { useRef, useState } from 'react'
 import CodeEditor from '../code-editor/CodeEditor'
-import type { FunctionTestResult, LogEntry } from '../code-runner/types'
+import type {
+  FunctionTestResult,
+  LineDiagnostic,
+  LogEntry,
+} from '../code-runner/types'
 import { useCodeRunner } from '../code-runner/useCodeRunner'
 import type { CodePractice } from '../../types/codePractice'
 import type { ActivityStatus } from '../../types/activityStatus'
@@ -39,18 +43,22 @@ function formatResultLine(result: FunctionTestResult, functionName: string) {
 export default function FunctionPracticeView({
   view,
 }: FunctionPracticeViewProps) {
-  const starterCode = buildStarterCode(view.functionSignature)
+  const starterCode = buildStarterCode(view.functionSignature, view.language)
   const { name: functionName } = parseFunctionSignature(view.functionSignature)
 
   const [code, setCode] = useState(starterCode)
   const [status, setStatus] = useState<ActivityStatus>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [results, setResults] = useState<FunctionTestResult[] | null>(null)
+  const [diagnostics, setDiagnostics] = useState<LineDiagnostic[]>([])
   const [consoleOutput, setConsoleOutput] = useState<{
     logs: LogEntry[]
     truncated: boolean
   } | null>(null)
-  const { run, running } = useCodeRunner()
+  const { run, running, runnerState, retry } = useCodeRunner(view.language)
+  const isPython = view.language === 'python'
+  const runnerStarting = isPython && runnerState.status === 'loading'
+  const runnerFailed = runnerState.status === 'failed'
   // Redo during a run makes that run stale, so its result is ignored.
   const runToken = useRef(0)
 
@@ -61,6 +69,7 @@ export default function FunctionPracticeView({
     const outcome = await run(code, functionName, view.testSuite)
     if (token !== runToken.current) return
     setResults(outcome.results)
+    setDiagnostics(outcome.diagnostics)
     setConsoleOutput({ logs: outcome.logs, truncated: outcome.logsTruncated })
     setStatus(outcome.allPassed ? 'correct' : 'incorrect')
     setMessage(
@@ -74,6 +83,7 @@ export default function FunctionPracticeView({
     setStatus(null)
     setMessage(null)
     setResults(null)
+    setDiagnostics([])
     setConsoleOutput(null)
   }
 
@@ -86,9 +96,14 @@ export default function FunctionPracticeView({
           onRedo={handleRedo}
           titleOrder={3}
           extra={
-            <Badge color="grape" variant="light">
-              Function Practice
-            </Badge>
+            <>
+              <Badge color="grape" variant="light">
+                Function Practice
+              </Badge>
+              <Badge color="gray" variant="light">
+                {isPython ? 'Python' : 'JavaScript'}
+              </Badge>
+            </>
           }
         />
         <Text c="dimmed" size="sm">
@@ -97,8 +112,9 @@ export default function FunctionPracticeView({
         <CodeEditor
           value={code}
           onChange={setCode}
-          language="javascript"
+          language={view.language}
           readOnly={passed}
+          diagnostics={diagnostics}
         />
         {results && (
           <Stack gap={4}>
@@ -125,9 +141,23 @@ export default function FunctionPracticeView({
           />
         )}
         <ActivityAlert status={status} message={message} />
+        {runnerFailed && (
+          <Alert
+            color="red"
+            radius="md"
+            title="The code runner is not available"
+          >
+            <Stack gap="xs" align="flex-start">
+              <Text size="sm">{runnerState.error}</Text>
+              <Button size="xs" variant="light" color="red" onClick={retry}>
+                Retry
+              </Button>
+            </Stack>
+          </Alert>
+        )}
         <Group justify="flex-end">
           <Button
-            disabled={passed}
+            disabled={passed || runnerStarting || runnerFailed}
             loading={running}
             onClick={handleRun}
             color={
@@ -144,7 +174,13 @@ export default function FunctionPracticeView({
                 : undefined,
             }}
           >
-            {passed ? 'All Tests Passed!' : 'Run Tests'}
+            {passed
+              ? 'All Tests Passed!'
+              : runnerStarting
+                ? runnerState.restarting
+                  ? 'Restarting Python...'
+                  : 'Loading Python...'
+                : 'Run Tests'}
           </Button>
         </Group>
       </Stack>

@@ -15,15 +15,18 @@ export interface LogEntry {
 
 export interface SetupError {
   message: string
-  line?: number
+  line?: number | null
 }
 
 export interface RawTestResult {
   outputJson?: string
   error?: string
+  line?: number | null
 }
 
 export type WorkerMessage =
+  | { type: 'ready' }
+  | { type: 'loadFailed'; message: string }
   | { type: 'log'; id: number; entry: LogEntry }
   | { type: 'logsTruncated'; id: number }
   | {
@@ -31,6 +34,7 @@ export type WorkerMessage =
       id: number
       setupError?: SetupError
       results: RawTestResult[]
+      fatal?: boolean
     }
 
 export interface FunctionTestResult {
@@ -38,4 +42,10 @@ export interface FunctionTestResult {
   actualOutput?: unknown
   passed: boolean
   error?: string
+  line?: number | null
+}
+
+export interface LineDiagnostic {
+  line: number
+  message: string
 }

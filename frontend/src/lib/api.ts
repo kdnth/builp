@@ -1,4 +1,5 @@
 import type { Course } from '../types/course'
+import type { CodeLanguage } from '../types/codeLanguage'
 import { getJWTToken } from './auth'
 
 const RAW_API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? ''
@@ -309,6 +310,7 @@ export interface GenerationJob {
   audience: string
   num_units: number
   lessons_per_unit: number
+  language: CodeLanguage
   course_id: string | null
   error: string | null
   created_at: string
@@ -320,6 +322,7 @@ interface SharedCreateGenerationJobInput {
   audience: string
   num_units: number
   lessons_per_unit: number
+  language: CodeLanguage
 }
 
 export type GenerationMode = 'free_credit' | 'provider_api_key'

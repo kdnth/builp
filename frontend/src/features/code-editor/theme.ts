@@ -71,6 +71,22 @@ function baseTheme(scheme: ColorScheme) {
             ? 'rgba(255, 255, 255, 0.04)'
             : 'rgba(0, 0, 0, 0.03)',
       },
+      '.cm-tooltip': {
+        color: 'var(--mantine-color-text)',
+        backgroundColor: 'var(--mantine-color-body)',
+        border: '1px solid var(--mantine-color-default-border)',
+        borderRadius: 'var(--mantine-radius-sm)',
+        boxShadow: 'var(--mantine-shadow-sm)',
+        overflow: 'hidden',
+      },
+      '.cm-tooltip-autocomplete > ul > li[aria-selected]': {
+        color: 'var(--mantine-color-text)',
+        backgroundColor: 'var(--mantine-primary-color-light)',
+      },
+      '.cm-diagnostic': {
+        fontFamily: 'var(--mantine-font-family-monospace)',
+        fontSize: 'var(--mantine-font-size-xs)',
+      },
       '&:not(.cm-focused) .cm-activeLine, &:not(.cm-focused) .cm-activeLineGutter':
         {
           backgroundColor: 'transparent',

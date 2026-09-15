@@ -22,6 +22,7 @@ from app.agent.schemas import (
     UnitSummary,
 )
 from app.agent.stage import StageOutcome, run_stage_with_retries
+from app.schemas.course import CodeLanguage
 
 MAX_ATTEMPTS = 3
 
@@ -31,6 +32,7 @@ def generate_overview(
     topic: str,
     audience: str,
     num_units: int,
+    language: CodeLanguage,
     model_config: GenerationModelConfig,
 ) -> StageOutcome[CourseOverview]:
     def generate(tier: ModelTier, feedback: str | None) -> CourseOverview:
@@ -38,7 +40,11 @@ def generate_overview(
             CourseOverview
         )
         messages = prompts.overview_generate_prompt(
-            topic=topic, audience=audience, num_units=num_units, feedback=feedback
+            topic=topic,
+            audience=audience,
+            num_units=num_units,
+            language=language,
+            feedback=feedback,
         )
         return model.invoke(messages)  # type: ignore[return-value]
 
@@ -62,6 +68,7 @@ def generate_unit_outline(
     overview: CourseOverview,
     unit: UnitSummary,
     lessons_per_unit: int,
+    language: CodeLanguage,
     model_config: GenerationModelConfig,
 ) -> StageOutcome[UnitOutline]:
     def generate(tier: ModelTier, feedback: str | None) -> UnitOutline:
@@ -72,6 +79,7 @@ def generate_unit_outline(
             overview=overview,
             unit=unit,
             lessons_per_unit=lessons_per_unit,
+            language=language,
             feedback=feedback,
             provider=model_config.provider,
         )
@@ -104,6 +112,7 @@ def generate_lesson_content(
     unit: UnitSummary,
     outline: UnitOutline,
     lesson_index: int,
+    language: CodeLanguage,
     model_config: GenerationModelConfig,
 ) -> StageOutcome[LessonContent]:
     def generate(tier: ModelTier, feedback: str | None) -> LessonContent:
@@ -115,6 +124,7 @@ def generate_lesson_content(
             unit=unit,
             outline=outline,
             lesson_index=lesson_index,
+            language=language,
             feedback=feedback,
             provider=model_config.provider,
         )
@@ -129,6 +139,7 @@ def generate_lesson_content(
             unit=unit,
             outline=outline,
             lesson_index=lesson_index,
+            language=language,
             content=content,
             provider=model_config.provider,
         )
@@ -136,7 +147,7 @@ def generate_lesson_content(
 
     return run_stage_with_retries(
         generate=generate,
-        check=check_lesson_content,
+        check=lambda content: check_lesson_content(content, language=language),
         evaluate=evaluate,
         default_tier="standard",
         max_attempts=MAX_ATTEMPTS,

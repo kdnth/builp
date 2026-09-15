@@ -104,6 +104,7 @@ def create_generation_job(
         audience=payload.audience,
         num_units=payload.num_units,
         lessons_per_unit=payload.lessons_per_unit,
+        language=payload.language,
     )
     db.add(job)
     db.commit()

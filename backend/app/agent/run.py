@@ -42,6 +42,7 @@ def run_generation_job(
                 audience=job.audience,
                 num_units=job.num_units,
                 lessons_per_unit=job.lessons_per_unit,
+                language=job.language,
                 model_config=active_model_config,
             )
         except Exception as exc:

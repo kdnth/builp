@@ -111,14 +111,13 @@ class GeneratedFunctionPractice(BaseModel):
     type: Literal["function"] = "function"
     title: str
     function_signature: str = Field(
-        description="e.g. 'add(a, b)' or 'isPalindrome(s)'."
+        description="e.g. 'add(a, b)', 'isPalindrome(s)', or 'is_palindrome(s)'."
     )
     description: str = Field(description="Instructions shown to the learner.")
     reference_solution: str = Field(
-        description="A correct JavaScript function body implementing "
-        "function_signature, e.g. 'function add(a, b) { return a + b }'. "
-        "Used only to check the test suite is internally consistent. "
-        "Never shown to the learner."
+        description="A complete, correct function in the course's programming "
+        "language that implements function_signature. Used only to check the "
+        "test suite is internally consistent. Never shown to the learner."
     )
     test_suite: list[GeneratedTestCase] = Field(min_length=2)
 

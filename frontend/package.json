@@ -43,6 +43,7 @@
     "postcss-preset-mantine": "^1.18.0",
     "postcss-simple-vars": "^7.0.1",
     "prettier": "^3.9.6",
+    "pyodide": "314.0.7",
     "react-markdown": "^10.1.0",
     "react-router-dom": "^7.18.3",
     "typescript": "~6.0.2",

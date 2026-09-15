@@ -7,6 +7,8 @@ from pydantic import BaseModel, ConfigDict, Field
 # schemas stay easy to compare side by side. The backend is the source of
 # truth: it never trusts the frontend's own validation.
 
+CodeLanguage = Literal["javascript", "python"]
+
 
 class TestCase(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -29,6 +31,7 @@ class FunctionCodePractice(BaseModel):
     type: Literal["function"]
     id: str = Field(min_length=1)
     title: str = Field(min_length=1)
+    language: CodeLanguage = "javascript"
     functionSignature: str = Field(min_length=1)
     description: str
     testSuite: list[TestCase] = Field(min_length=1)

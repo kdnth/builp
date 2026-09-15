@@ -8,8 +8,10 @@ call is skipped entirely.
 """
 
 import json
+import os
 import re
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -21,6 +23,7 @@ from app.agent.schemas import (
     LessonContent,
     UnitOutline,
 )
+from app.schemas.course import CodeLanguage
 
 
 def check_overview_unit_count(overview: CourseOverview, expected: int) -> list[str]:
@@ -91,38 +94,92 @@ if (mismatches.length > 0) {
 """
 
 
-def check_function_practice_consistency(
-    practice: GeneratedFunctionPractice,
-) -> str | None:
-    """Run `practice.reference_solution` against `practice.test_suite` in a
-    Node subprocess. Returns None if it passes its own tests, or a problem
-    description otherwise.
+_PYTHON_CHECK_TEMPLATE = """
+import json
 
-    A code practice whose own reference solution can't pass its test suite
-    means the test suite is wrong, since a correct implementation should
-    exist by construction. Worth catching before a lesson ships.
-    """
-    script = _NODE_CHECK_TEMPLATE % {
-        "reference_solution": json.dumps(practice.reference_solution),
-        "function_name": json.dumps(_function_name(practice.function_signature)),
-        "test_cases": json.dumps(
-            [
-                {"input": tc.input, "expected_output": tc.expected_output}
-                for tc in practice.test_suite
-            ]
-        ),
-    }
+reference_solution = %(reference_solution)s
+function_name = %(function_name)s
+test_cases = json.loads(%(test_cases)s)
 
-    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as f:
+
+def report(ok, problem=None):
+    print()
+    print(json.dumps({"ok": ok, "problem": problem}))
+    raise SystemExit(0)
+
+
+def canonical(value):
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    if isinstance(value, (list, tuple)):
+        return [canonical(item) for item in value]
+    if isinstance(value, dict):
+        return {key: canonical(item) for key, item in value.items()}
+    return value
+
+
+def encode(value):
+    return json.dumps(
+        canonical(value), separators=(",", ":"), ensure_ascii=False, allow_nan=False
+    )
+
+
+namespace = {"__name__": "__main__"}
+try:
+    exec(compile(reference_solution, "<solution>", "exec"), namespace)
+except SyntaxError as exc:
+    report(False, f"reference solution does not parse: {exc}")
+except Exception as exc:
+    report(False, f"reference solution raised on load: {type(exc).__name__}: {exc}")
+
+fn = namespace.get(function_name)
+if not callable(fn):
+    report(False, f"reference solution does not define a function {function_name}")
+
+mismatches = []
+for index, case in enumerate(test_cases):
+    call = f"{function_name}({json.dumps(case['input'])[1:-1]})"
+    try:
+        actual = fn(*case["input"])
+    except Exception as exc:
+        mismatches.append(f"test {index} raised {type(exc).__name__}: {exc}")
+        continue
+    try:
+        actual_json = encode(actual)
+    except (TypeError, ValueError):
+        mismatches.append(
+            f"test {index}: {call} returned {actual!r}, which is not JSON "
+            "serializable (return a number, string, bool, None, list, or dict)"
+        )
+        continue
+    expected_json = encode(case["expected_output"])
+    if actual_json != expected_json:
+        mismatches.append(
+            f"test {index}: {call} returned {actual_json}, expected {expected_json}"
+        )
+
+if mismatches:
+    report(
+        False, "reference solution fails its own test suite: " + "; ".join(mismatches)
+    )
+report(True)
+"""
+
+CHECK_TIMEOUT_SECONDS = 5
+
+
+def _run_check_script(command: list[str], script: str, suffix: str) -> str | None:
+    with tempfile.NamedTemporaryFile("w", suffix=suffix, delete=False) as f:
         f.write(script)
         script_path = f.name
 
     try:
         result = subprocess.run(
-            ["node", script_path],
+            [*command, script_path],
             capture_output=True,
             text=True,
-            timeout=5,
+            timeout=CHECK_TIMEOUT_SECONDS,
+            env={"PATH": os.environ.get("PATH", "")},
         )
     except FileNotFoundError:
         return None
@@ -134,12 +191,46 @@ def check_function_practice_consistency(
     if result.returncode != 0:
         return f"reference solution crashed: {result.stderr.strip()[:500]}"
 
+    lines = result.stdout.strip().splitlines()
     try:
-        outcome = json.loads(result.stdout.strip())
-    except json.JSONDecodeError:
+        outcome = json.loads(lines[-1])
+    except (IndexError, json.JSONDecodeError):
         return f"could not parse check output: {result.stdout[:500]}"
 
     return None if outcome.get("ok") else outcome.get("problem", "unknown problem")
+
+
+def check_function_practice_consistency(
+    practice: GeneratedFunctionPractice, *, language: CodeLanguage
+) -> str | None:
+    """Run `practice.reference_solution` against `practice.test_suite` in a
+    Node or Python subprocess. Returns None if it passes its own tests, or a
+    problem description otherwise.
+
+    A code practice whose own reference solution can't pass its test suite
+    means the test suite is wrong, since a correct implementation should
+    exist by construction. Worth catching before a lesson ships.
+    """
+    function_name = _function_name(practice.function_signature)
+    test_cases = [
+        {"input": tc.input, "expected_output": tc.expected_output}
+        for tc in practice.test_suite
+    ]
+
+    if language == "python":
+        script = _PYTHON_CHECK_TEMPLATE % {
+            "reference_solution": repr(practice.reference_solution),
+            "function_name": repr(function_name),
+            "test_cases": repr(json.dumps(test_cases)),
+        }
+        return _run_check_script([sys.executable, "-I"], script, ".py")
+
+    script = _NODE_CHECK_TEMPLATE % {
+        "reference_solution": json.dumps(practice.reference_solution),
+        "function_name": json.dumps(function_name),
+        "test_cases": json.dumps(test_cases),
+    }
+    return _run_check_script(["node"], script, ".js")
 
 
 def check_fill_blank_consistency(activity: GeneratedFillBlankActivity) -> str | None:
@@ -163,7 +254,9 @@ def check_multiple_choice_consistency(
     return None
 
 
-def check_lesson_content(content: LessonContent) -> list[str]:
+def check_lesson_content(
+    content: LessonContent, *, language: CodeLanguage
+) -> list[str]:
     """Every deterministic check applicable to a generated lesson.
 
     Returns a list of problems, empty if everything checks out.
@@ -171,7 +264,9 @@ def check_lesson_content(content: LessonContent) -> list[str]:
     problems: list[str] = []
 
     if content.code_practice is not None:
-        problem = check_function_practice_consistency(content.code_practice)
+        problem = check_function_practice_consistency(
+            content.code_practice, language=language
+        )
         if problem:
             problems.append(problem)
 

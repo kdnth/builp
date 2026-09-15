@@ -40,8 +40,20 @@ Object.assign(console, {
   error: (...args: unknown[]) => write('stderr', args),
 })
 
+const SOURCE_URL = 'solution.js'
+
+const FUNCTION_HEADER_LINES = 2
+
 function errorMessage(err: unknown) {
   return err instanceof Error ? `${err.name}: ${err.message}` : String(err)
+}
+
+function errorLine(err: unknown, lineCount: number) {
+  if (!(err instanceof Error) || !err.stack) return undefined
+  const match = err.stack.match(/solution\.js:(\d+):\d+/)
+  if (!match) return undefined
+  const line = Number(match[1]) - FUNCTION_HEADER_LINES
+  return line >= 1 && line <= lineCount ? line : undefined
 }
 
 function serializeOutput(value: unknown): RawTestResult {
@@ -58,15 +70,22 @@ self.addEventListener('message', (event: MessageEvent<RunRequest>) => {
   sink = createLogSink(id, post)
   currentTestIndex = null
 
+  const lineCount = code.split('\n').length
+
   let fn: unknown
   try {
     // eslint-disable-next-line no-new-func
-    fn = new Function(`${code}\nreturn ${functionName};`)()
+    fn = new Function(
+      `${code}\nreturn ${functionName};\n//# sourceURL=${SOURCE_URL}`,
+    )()
   } catch (err) {
     post({
       type: 'result',
       id,
-      setupError: { message: errorMessage(err) },
+      setupError: {
+        message: errorMessage(err),
+        line: errorLine(err, lineCount),
+      },
       results: [],
     })
     return
@@ -87,10 +106,12 @@ self.addEventListener('message', (event: MessageEvent<RunRequest>) => {
     try {
       return serializeOutput(fn(...testCase.input))
     } catch (err) {
-      return { error: errorMessage(err) }
+      return { error: errorMessage(err), line: errorLine(err, lineCount) }
     }
   })
   currentTestIndex = null
 
   post({ type: 'result', id, results })
 })
+
+post({ type: 'ready' })
