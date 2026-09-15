@@ -151,6 +151,19 @@ export default function GenerateCoursePage() {
                 ]}
               />
             </Stack>
+            <Stack gap={4}>
+              <Text size="sm" fw={500}>
+                Programming language
+              </Text>
+              <SegmentedControl
+                value={language}
+                onChange={(value) => setLanguage(value as CodeLanguage)}
+                data={[
+                  { label: 'JavaScript', value: 'javascript' },
+                  { label: 'Python', value: 'python' },
+                ]}
+              />
+            </Stack>
             <TextInput
               label="Topic"
               placeholder={PLACEHOLDERS[language].topic}
