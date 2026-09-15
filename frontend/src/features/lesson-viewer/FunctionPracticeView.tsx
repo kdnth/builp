@@ -1,5 +1,6 @@
-import { Badge, Button, Group, Paper, Stack, Text, Textarea } from '@mantine/core'
+import { Badge, Button, Group, Paper, Stack, Text } from '@mantine/core'
 import { useState } from 'react'
+import CodeEditor from '../code-editor/CodeEditor'
 import type { CodePractice } from '../../types/codePractice'
 import type { ActivityStatus } from '../../types/activityStatus'
 import {
@@ -7,7 +8,10 @@ import {
   passedMessages,
   pickRandomMessage,
 } from '../../helpers/activityMessages'
-import { buildStarterCode, parseFunctionSignature } from '../../helpers/functionSignature'
+import {
+  buildStarterCode,
+  parseFunctionSignature,
+} from '../../helpers/functionSignature'
 import {
   runFunctionTests,
   type FunctionTestResult,
@@ -29,7 +33,9 @@ function formatResultLine(result: FunctionTestResult, functionName: string) {
   return `${call} → ${JSON.stringify(result.actualOutput)} (expected ${JSON.stringify(result.testCase.expectedOutput)})`
 }
 
-export default function FunctionPracticeView({ view }: FunctionPracticeViewProps) {
+export default function FunctionPracticeView({
+  view,
+}: FunctionPracticeViewProps) {
   const starterCode = buildStarterCode(view.functionSignature)
   const { name: functionName } = parseFunctionSignature(view.functionSignature)
 
@@ -75,13 +81,11 @@ export default function FunctionPracticeView({ view }: FunctionPracticeViewProps
         <Text c="dimmed" size="sm">
           {view.description}
         </Text>
-        <Textarea
+        <CodeEditor
           value={code}
-          onChange={(e) => setCode(e.currentTarget.value)}
-          disabled={passed}
-          autosize
-          minRows={4}
-          styles={{ input: { fontFamily: 'var(--mantine-font-family-monospace)' } }}
+          onChange={setCode}
+          language="javascript"
+          readOnly={passed}
         />
         {results && (
           <Stack gap={4}>
@@ -92,7 +96,8 @@ export default function FunctionPracticeView({ view }: FunctionPracticeViewProps
                 c={result.passed ? 'green' : 'red'}
                 ff="monospace"
               >
-                {result.passed ? '✓' : '✗'} {formatResultLine(result, functionName)}
+                {result.passed ? '✓' : '✗'}{' '}
+                {formatResultLine(result, functionName)}
               </Text>
             ))}
           </Stack>
@@ -102,7 +107,9 @@ export default function FunctionPracticeView({ view }: FunctionPracticeViewProps
           <Button
             disabled={passed}
             onClick={handleRun}
-            color={status === 'incorrect' ? 'red' : passed ? 'green' : undefined}
+            color={
+              status === 'incorrect' ? 'red' : passed ? 'green' : undefined
+            }
             styles={{
               root: passed
                 ? {
