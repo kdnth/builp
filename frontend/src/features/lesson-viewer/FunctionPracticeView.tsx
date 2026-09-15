@@ -1,6 +1,8 @@
 import { Badge, Button, Group, Paper, Stack, Text } from '@mantine/core'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import CodeEditor from '../code-editor/CodeEditor'
+import type { FunctionTestResult, LogEntry } from '../code-runner/types'
+import { useCodeRunner } from '../code-runner/useCodeRunner'
 import type { CodePractice } from '../../types/codePractice'
 import type { ActivityStatus } from '../../types/activityStatus'
 import {
@@ -12,12 +14,9 @@ import {
   buildStarterCode,
   parseFunctionSignature,
 } from '../../helpers/functionSignature'
-import {
-  runFunctionTests,
-  type FunctionTestResult,
-} from '../../helpers/runFunctionTests'
 import ActivityHeader from './ActivityHeader'
 import ActivityAlert from './ActivityAlert'
+import ConsolePanel from './ConsolePanel'
 
 type FunctionPractice = Extract<CodePractice, { type: 'function' }>
 
@@ -25,8 +24,12 @@ interface FunctionPracticeViewProps {
   view: FunctionPractice
 }
 
+function formatCall(functionName: string, input: unknown[]) {
+  return `${functionName}(${input.map((i) => JSON.stringify(i)).join(', ')})`
+}
+
 function formatResultLine(result: FunctionTestResult, functionName: string) {
-  const call = `${functionName}(${result.testCase.input.map((i) => JSON.stringify(i)).join(', ')})`
+  const call = formatCall(functionName, result.testCase.input)
   if (result.error) {
     return `${call} → Error: ${result.error}`
   }
@@ -43,25 +46,35 @@ export default function FunctionPracticeView({
   const [status, setStatus] = useState<ActivityStatus>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [results, setResults] = useState<FunctionTestResult[] | null>(null)
+  const [consoleOutput, setConsoleOutput] = useState<{
+    logs: LogEntry[]
+    truncated: boolean
+  } | null>(null)
+  const { run, running } = useCodeRunner()
+  // Redo during a run makes that run stale, so its result is ignored.
+  const runToken = useRef(0)
 
   const passed = status === 'correct'
 
-  function handleRun() {
-    const { results: next, allPassed } = runFunctionTests(
-      code,
-      functionName,
-      view.testSuite,
+  async function handleRun() {
+    const token = ++runToken.current
+    const outcome = await run(code, functionName, view.testSuite)
+    if (token !== runToken.current) return
+    setResults(outcome.results)
+    setConsoleOutput({ logs: outcome.logs, truncated: outcome.logsTruncated })
+    setStatus(outcome.allPassed ? 'correct' : 'incorrect')
+    setMessage(
+      pickRandomMessage(outcome.allPassed ? passedMessages : failedMessages),
     )
-    setResults(next)
-    setStatus(allPassed ? 'correct' : 'incorrect')
-    setMessage(pickRandomMessage(allPassed ? passedMessages : failedMessages))
   }
 
   function handleRedo() {
+    runToken.current += 1
     setCode(starterCode)
     setStatus(null)
     setMessage(null)
     setResults(null)
+    setConsoleOutput(null)
   }
 
   return (
@@ -102,10 +115,20 @@ export default function FunctionPracticeView({
             ))}
           </Stack>
         )}
+        {consoleOutput && (
+          <ConsolePanel
+            logs={consoleOutput.logs}
+            truncated={consoleOutput.truncated}
+            labelForTest={(index) =>
+              `Test ${index + 1}: ${formatCall(functionName, view.testSuite[index].input)}`
+            }
+          />
+        )}
         <ActivityAlert status={status} message={message} />
         <Group justify="flex-end">
           <Button
             disabled={passed}
+            loading={running}
             onClick={handleRun}
             color={
               status === 'incorrect' ? 'red' : passed ? 'green' : undefined
