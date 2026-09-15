@@ -47,6 +47,7 @@
     "pyodide": "314.0.7",
     "react-markdown": "^10.1.0",
     "react-router-dom": "^7.18.3",
+    "remark-gfm": "^4.0.1",
     "typescript": "~6.0.2",
     "vite": "^8.2.2"
   }
