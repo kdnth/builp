@@ -13,7 +13,12 @@ from app.agent.checks import (
     check_outline_lesson_count,
     check_overview_unit_count,
 )
-from app.agent.llm import GenerationModelConfig, ModelTier, get_model
+from app.agent.llm import (
+    CallUsage,
+    GenerationModelConfig,
+    ModelTier,
+    invoke_structured,
+)
 from app.agent.schemas import (
     CourseOverview,
     EvaluationResult,
@@ -35,10 +40,9 @@ def generate_overview(
     language: CodeLanguage,
     model_config: GenerationModelConfig,
 ) -> StageOutcome[CourseOverview]:
+    calls: list[CallUsage] = []
+
     def generate(tier: ModelTier, feedback: str | None) -> CourseOverview:
-        model = get_model(tier=tier, model_config=model_config).with_structured_output(
-            CourseOverview
-        )
         messages = prompts.overview_generate_prompt(
             topic=topic,
             audience=audience,
@@ -46,13 +50,24 @@ def generate_overview(
             language=language,
             feedback=feedback,
         )
-        return model.invoke(messages)  # type: ignore[return-value]
+        return invoke_structured(
+            schema=CourseOverview,
+            messages=messages,
+            tier=tier,
+            model_config=model_config,
+            purpose="generate",
+            calls=calls,
+        )
 
     def evaluate(overview: CourseOverview) -> EvaluationResult:
-        model = get_model(
-            tier="fast", model_config=model_config
-        ).with_structured_output(EvaluationResult)
-        return model.invoke(prompts.overview_evaluate_prompt(overview))  # type: ignore[return-value]
+        return invoke_structured(
+            schema=EvaluationResult,
+            messages=prompts.overview_evaluate_prompt(overview),
+            tier="fast",
+            model_config=model_config,
+            purpose="evaluate",
+            calls=calls,
+        )
 
     return run_stage_with_retries(
         generate=generate,
@@ -60,6 +75,7 @@ def generate_overview(
         evaluate=evaluate,
         default_tier="standard",
         max_attempts=MAX_ATTEMPTS,
+        calls=calls,
     )
 
 
@@ -71,10 +87,9 @@ def generate_unit_outline(
     language: CodeLanguage,
     model_config: GenerationModelConfig,
 ) -> StageOutcome[UnitOutline]:
+    calls: list[CallUsage] = []
+
     def generate(tier: ModelTier, feedback: str | None) -> UnitOutline:
-        model = get_model(tier=tier, model_config=model_config).with_structured_output(
-            UnitOutline
-        )
         messages = prompts.unit_outline_generate_prompt(
             overview=overview,
             unit=unit,
@@ -83,19 +98,30 @@ def generate_unit_outline(
             feedback=feedback,
             provider=model_config.provider,
         )
-        return model.invoke(messages)  # type: ignore[return-value]
+        return invoke_structured(
+            schema=UnitOutline,
+            messages=messages,
+            tier=tier,
+            model_config=model_config,
+            purpose="generate",
+            calls=calls,
+        )
 
     def evaluate(outline: UnitOutline) -> EvaluationResult:
-        model = get_model(
-            tier="fast", model_config=model_config
-        ).with_structured_output(EvaluationResult)
         messages = prompts.unit_outline_evaluate_prompt(
             overview=overview,
             unit=unit,
             outline=outline,
             provider=model_config.provider,
         )
-        return model.invoke(messages)  # type: ignore[return-value]
+        return invoke_structured(
+            schema=EvaluationResult,
+            messages=messages,
+            tier="fast",
+            model_config=model_config,
+            purpose="evaluate",
+            calls=calls,
+        )
 
     return run_stage_with_retries(
         generate=generate,
@@ -103,6 +129,7 @@ def generate_unit_outline(
         evaluate=evaluate,
         default_tier="fast",
         max_attempts=MAX_ATTEMPTS,
+        calls=calls,
     )
 
 
@@ -115,10 +142,9 @@ def generate_lesson_content(
     language: CodeLanguage,
     model_config: GenerationModelConfig,
 ) -> StageOutcome[LessonContent]:
+    calls: list[CallUsage] = []
+
     def generate(tier: ModelTier, feedback: str | None) -> LessonContent:
-        model = get_model(tier=tier, model_config=model_config).with_structured_output(
-            LessonContent
-        )
         messages = prompts.lesson_content_generate_prompt(
             overview=overview,
             unit=unit,
@@ -128,12 +154,16 @@ def generate_lesson_content(
             feedback=feedback,
             provider=model_config.provider,
         )
-        return model.invoke(messages)  # type: ignore[return-value]
+        return invoke_structured(
+            schema=LessonContent,
+            messages=messages,
+            tier=tier,
+            model_config=model_config,
+            purpose="generate",
+            calls=calls,
+        )
 
     def evaluate(content: LessonContent) -> EvaluationResult:
-        model = get_model(
-            tier="fast", model_config=model_config
-        ).with_structured_output(EvaluationResult)
         messages = prompts.lesson_content_evaluate_prompt(
             overview=overview,
             unit=unit,
@@ -143,7 +173,14 @@ def generate_lesson_content(
             content=content,
             provider=model_config.provider,
         )
-        return model.invoke(messages)  # type: ignore[return-value]
+        return invoke_structured(
+            schema=EvaluationResult,
+            messages=messages,
+            tier="fast",
+            model_config=model_config,
+            purpose="evaluate",
+            calls=calls,
+        )
 
     return run_stage_with_retries(
         generate=generate,
@@ -151,4 +188,5 @@ def generate_lesson_content(
         evaluate=evaluate,
         default_tier="standard",
         max_attempts=MAX_ATTEMPTS,
+        calls=calls,
     )

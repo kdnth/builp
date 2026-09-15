@@ -7,12 +7,19 @@ place that moves a GenerationJob row from pending -> running ->
 succeeded | failed.
 """
 
+import logging
+
+from sqlalchemy.orm import Session
+
 from app.agent.graph import run_generation
 from app.agent.llm import GenerationModelConfig, default_free_credit_model_config
+from app.agent.metrics import DatabaseMetricsReporter, summarize_job_metrics
 from app.agent.progress import DatabaseProgressReporter
 from app.database import SessionLocal
 from app.models import Course as CourseModel
 from app.models import GenerationJob
+
+logger = logging.getLogger(__name__)
 
 
 def _sanitize_error(message: str, *, secrets: list[str]) -> str:
@@ -22,6 +29,14 @@ def _sanitize_error(message: str, *, secrets: list[str]) -> str:
         if normalized:
             sanitized = sanitized.replace(normalized, "[REDACTED]")
     return sanitized
+
+
+def _job_metrics(db: Session, job_id: str) -> dict | None:
+    try:
+        return summarize_job_metrics(db, job_id)
+    except Exception:
+        logger.exception("Could not summarize metrics for job %s", job_id)
+        return None
 
 
 def run_generation_job(
@@ -49,6 +64,7 @@ def run_generation_job(
                 language=job.language,
                 model_config=active_model_config,
                 progress=DatabaseProgressReporter(job.id, SessionLocal),
+                metrics=DatabaseMetricsReporter(job.id, SessionLocal),
             )
         except Exception as exc:
             # This is the top-level job boundary: every failure, model
@@ -58,6 +74,7 @@ def run_generation_job(
             job.error = _sanitize_error(
                 str(exc), secrets=[active_model_config.api_key or ""]
             )[:2000]
+            job.metrics = _job_metrics(db, job.id)
             db.commit()
             return
 
@@ -73,6 +90,7 @@ def run_generation_job(
 
         job.status = "succeeded"
         job.course_id = course.id
+        job.metrics = _job_metrics(db, job.id)
         db.commit()
     finally:
         db.close()

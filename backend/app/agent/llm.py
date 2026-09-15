@@ -13,7 +13,8 @@ from typing import Literal
 from dotenv import load_dotenv
 from langchain_anthropic import ChatAnthropic
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import BaseMessage, SystemMessage
+from pydantic import BaseModel
 
 # Chat model integrations read API keys from process environment variables.
 # pydantic-settings parsing .env in app/config.py does not automatically set
@@ -22,6 +23,29 @@ load_dotenv()
 
 ModelTier = Literal["fast", "standard", "strong"]
 SupportedProvider = Literal["anthropic"]
+CallPurpose = Literal["generate", "evaluate"]
+
+
+@dataclass(frozen=True)
+class CallUsage:
+    """Token counts for one model call, for cost and quality measurement."""
+
+    purpose: CallPurpose
+    tier: ModelTier
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cache_read_tokens: int = 0
+    cache_creation_tokens: int = 0
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "purpose": self.purpose,
+            "tier": self.tier,
+            "input_tokens": self.input_tokens,
+            "output_tokens": self.output_tokens,
+            "cache_read_tokens": self.cache_read_tokens,
+            "cache_creation_tokens": self.cache_creation_tokens,
+        }
 
 
 @dataclass(frozen=True)
@@ -99,3 +123,49 @@ def cached_system_message(text: str, *, provider: SupportedProvider) -> SystemMe
             {"type": "text", "text": text, "cache_control": {"type": "ephemeral"}}
         ]
     )
+
+
+def _usage_from_message(
+    message: object, *, purpose: CallPurpose, tier: ModelTier
+) -> CallUsage:
+    usage = getattr(message, "usage_metadata", None) or {}
+    details = usage.get("input_token_details") or {}
+    return CallUsage(
+        purpose=purpose,
+        tier=tier,
+        input_tokens=usage.get("input_tokens", 0),
+        output_tokens=usage.get("output_tokens", 0),
+        cache_read_tokens=details.get("cache_read", 0),
+        cache_creation_tokens=details.get("cache_creation", 0),
+    )
+
+
+def invoke_structured[T: BaseModel](
+    *,
+    schema: type[T],
+    messages: list[BaseMessage],
+    tier: ModelTier,
+    model_config: GenerationModelConfig,
+    purpose: CallPurpose,
+    calls: list[CallUsage],
+) -> T:
+    """One structured-output call, with its token usage appended to `calls`.
+
+    `include_raw=True` keeps the raw message, which carries usage_metadata.
+    It also turns a parsing failure into a returned error instead of a
+    raised one, so this re-raises it to keep the retry behavior in
+    stage.py unchanged.
+    """
+    model = get_model(tier=tier, model_config=model_config)
+    result = model.with_structured_output(schema, include_raw=True).invoke(messages)
+    if not isinstance(result, dict):
+        return result
+
+    calls.append(_usage_from_message(result.get("raw"), purpose=purpose, tier=tier))
+    parsed = result.get("parsed")
+    if parsed is None:
+        raise ValueError(
+            f"Model did not return a valid {schema.__name__}: "
+            f"{result.get('parsing_error')}"
+        )
+    return parsed

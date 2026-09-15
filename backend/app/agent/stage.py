@@ -15,7 +15,7 @@ model call or an API key.
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from app.agent.llm import ModelTier, tier_for_attempt
+from app.agent.llm import CallUsage, ModelTier, tier_for_attempt
 from app.agent.schemas import EvaluationResult
 
 
@@ -33,6 +33,7 @@ class StageOutcome[T]:
     content: T
     passed: bool
     attempts: list[StageAttempt[T]] = field(default_factory=list)
+    calls: list[CallUsage] = field(default_factory=list)
 
     @property
     def attempt_count(self) -> int:
@@ -46,6 +47,7 @@ def run_stage_with_retries[T](
     evaluate: Callable[[T], EvaluationResult],
     default_tier: ModelTier,
     max_attempts: int = 3,
+    calls: list[CallUsage] | None = None,
 ) -> StageOutcome[T]:
     """Run one stage's generate/check/evaluate loop.
 
@@ -134,13 +136,18 @@ def run_stage_with_retries[T](
         )
 
         if evaluation.passed:
-            return StageOutcome(content=content, passed=True, attempts=attempts)
+            return StageOutcome(
+                content=content, passed=True, attempts=attempts, calls=calls or []
+            )
 
         feedback = evaluation.feedback
 
     if attempts:
         return StageOutcome(
-            content=attempts[-1].content, passed=False, attempts=attempts
+            content=attempts[-1].content,
+            passed=False,
+            attempts=attempts,
+            calls=calls or [],
         )
 
     assert last_error is not None  # every loop iteration sets one or the other
