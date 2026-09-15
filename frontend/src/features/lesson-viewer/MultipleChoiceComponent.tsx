@@ -1,4 +1,12 @@
-import { Button, Chip, ChipGroup, Group, Paper, Stack, Text } from '@mantine/core'
+import {
+  Button,
+  Chip,
+  ChipGroup,
+  Group,
+  Paper,
+  Stack,
+  Text,
+} from '@mantine/core'
 import type { MultipleChoice } from '../../types/multipleChoice'
 import { useEffect, useState } from 'react'
 import type { ActivityStatus } from '../../types/activityStatus'
@@ -35,14 +43,17 @@ export default function MultipleChoiceComponent({
   const handleChipClick = (event: React.MouseEvent<HTMLInputElement>) => {
     setStatus(null)
     setMessage(null)
-    setValue(event.currentTarget.value === value ? null : event.currentTarget.value)
+    setValue(
+      event.currentTarget.value === value ? null : event.currentTarget.value,
+    )
   }
 
   // as of right now nothing stops people from writing MCQ with >=8 questions
   const questionLabels = ['A', 'B', 'C', 'D', 'E', 'F', 'G']
 
   function handleSubmit() {
-    const isCorrect = value !== null && Number.parseInt(value) === activity.correctIndex
+    const isCorrect =
+      value !== null && Number.parseInt(value) === activity.correctIndex
     setStatus(isCorrect ? 'correct' : 'incorrect')
     setMessage(pickRandomMessage(isCorrect ? passedMessages : failedMessages))
     if (!isCorrect) {
@@ -53,7 +64,9 @@ export default function MultipleChoiceComponent({
   function handleShowAnswer() {
     setValue(activity.correctIndex.toString())
     setStatus('revealed')
-    setMessage(`Here's the answer: ${questionLabels[activity.correctIndex]}. ${activity.options[activity.correctIndex]}`)
+    setMessage(
+      `Here's the answer: ${questionLabels[activity.correctIndex]}. ${activity.options[activity.correctIndex]}`,
+    )
   }
 
   function handleRedo() {
@@ -64,7 +77,13 @@ export default function MultipleChoiceComponent({
   }
 
   const chipColor =
-    status === 'incorrect' ? 'red' : passed ? 'green' : revealed ? 'yellow' : undefined
+    status === 'incorrect'
+      ? 'red'
+      : passed
+        ? 'green'
+        : revealed
+          ? 'yellow'
+          : undefined
 
   return (
     <Paper withBorder radius="md" p="lg">
