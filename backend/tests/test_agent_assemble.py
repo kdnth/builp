@@ -36,11 +36,12 @@ def test_assemble_lesson_with_code_and_activities():
         ],
     )
 
-    lesson = assemble_lesson("Addition", content)
+    lesson = assemble_lesson("Addition", content, "javascript")
 
     assert lesson.title == "Addition"
     assert lesson.writtenLesson.markdown.startswith("# Adding numbers")
     assert len(lesson.codePractices) == 1
+    assert lesson.codePractices[0].language == "javascript"
     assert lesson.codePractices[0].testSuite[0].expectedOutput == 3
     assert len(lesson.interactivePractices) == 1
     assert len(lesson.interactivePractices[0].activities) == 2
@@ -65,9 +66,30 @@ def test_assemble_lesson_with_no_code_or_activities():
         code_practice=None,
         interactive_activities=[],
     )
-    lesson = assemble_lesson("Reading", content)
+    lesson = assemble_lesson("Reading", content, "javascript")
     assert lesson.codePractices == []
     assert lesson.interactivePractices == []
+
+
+def test_assemble_lesson_sets_python_language_on_code_practice():
+    content = LessonContent(
+        written_lesson_markdown="# Adding numbers",
+        code_practice=GeneratedFunctionPractice(
+            title="Add",
+            function_signature="add(a, b)",
+            description="Add two numbers.",
+            reference_solution="def add(a, b):\n    return a + b",
+            test_suite=[
+                GeneratedTestCase(input=[1, 2], expected_output=3),
+                GeneratedTestCase(input=[5, 5], expected_output=10),
+            ],
+        ),
+        interactive_activities=[],
+    )
+
+    lesson = assemble_lesson("Addition", content, "python")
+
+    assert lesson.codePractices[0].language == "python"
 
 
 def test_assemble_course_matches_real_schema():
@@ -88,6 +110,7 @@ def test_assemble_course_matches_real_schema():
             code_practice=None,
             interactive_activities=[],
         ),
+        "javascript",
     )
 
     course = assemble_course(overview, unit_lessons=[[lesson], [lesson]])

@@ -1,3 +1,4 @@
+import type { CodeLanguage } from './codeLanguage'
 import type { TestCase } from './testCase'
 
 export type CodePractice =
@@ -5,6 +6,7 @@ export type CodePractice =
       type: 'function'
       id: string
       title: string
+      language: CodeLanguage
       functionSignature: string
       description: string
       testSuite: TestCase[]

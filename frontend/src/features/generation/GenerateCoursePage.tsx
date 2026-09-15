@@ -9,6 +9,7 @@ import {
   PasswordInput,
   Paper,
   Radio,
+  SegmentedControl,
   Stack,
   Text,
   TextInput,
@@ -22,6 +23,23 @@ import {
   type GenerationMode,
 } from '../../lib/api'
 import { useAuthSession } from '../../lib/auth'
+import type { CodeLanguage } from '../../types/codeLanguage'
+
+interface Placeholders {
+  topic: string
+  audience: string
+}
+
+const PLACEHOLDERS: Record<CodeLanguage, Placeholders> = {
+  javascript: {
+    topic: 'JavaScript array methods (map, filter, reduce)',
+    audience: 'Developers who know basic JS but not functional array methods',
+  },
+  python: {
+    topic: 'Python dictionaries and list comprehensions',
+    audience: 'Beginners who know Python variables, loops, and functions',
+  },
+}
 
 export default function GenerateCoursePage() {
   const navigate = useNavigate()
@@ -30,6 +48,7 @@ export default function GenerateCoursePage() {
   const [audience, setAudience] = useState('')
   const [numUnits, setNumUnits] = useState(3)
   const [lessonsPerUnit, setLessonsPerUnit] = useState(3)
+  const [language, setLanguage] = useState<CodeLanguage>('javascript')
   const [generationMode, setGenerationMode] = useState<GenerationMode>('free_credit')
   const [providerApiKey, setProviderApiKey] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -45,6 +64,7 @@ export default function GenerateCoursePage() {
         audience,
         num_units: numUnits,
         lessons_per_unit: lessonsPerUnit,
+        language,
       }
 
       let input: CreateGenerationJobInput
@@ -115,16 +135,29 @@ export default function GenerateCoursePage() {
                 a minute or two.
               </Text>
             </Stack>
+            <Stack gap={4}>
+              <Text size="sm" fw={500}>
+                Programming language
+              </Text>
+              <SegmentedControl
+                value={language}
+                onChange={(value) => setLanguage(value as CodeLanguage)}
+                data={[
+                  { label: 'JavaScript', value: 'javascript' },
+                  { label: 'Python', value: 'python' },
+                ]}
+              />
+            </Stack>
             <TextInput
               label="Topic"
-              placeholder="JavaScript array methods (map, filter, reduce)"
+              placeholder={PLACEHOLDERS[language].topic}
               value={topic}
               onChange={(e) => setTopic(e.currentTarget.value)}
               required
             />
             <TextInput
               label="Audience"
-              placeholder="Developers who know basic JS but not functional array methods"
+              placeholder={PLACEHOLDERS[language].audience}
               value={audience}
               onChange={(e) => setAudience(e.currentTarget.value)}
               required

@@ -16,7 +16,11 @@ def _new_id() -> str:
     return str(uuid.uuid4())
 
 
-def assemble_lesson(title: str, content: gen.LessonContent) -> course_schema.Lesson:
+def assemble_lesson(
+    title: str,
+    content: gen.LessonContent,
+    language: course_schema.CodeLanguage,
+) -> course_schema.Lesson:
     written_lesson = course_schema.WrittenLesson(
         id=_new_id(), title=title, markdown=content.written_lesson_markdown
     )
@@ -29,6 +33,7 @@ def assemble_lesson(title: str, content: gen.LessonContent) -> course_schema.Les
                 type="function",
                 id=_new_id(),
                 title=cp.title,
+                language=language,
                 functionSignature=cp.function_signature,
                 description=cp.description,
                 testSuite=[

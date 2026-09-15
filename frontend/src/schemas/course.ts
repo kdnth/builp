@@ -15,6 +15,7 @@ const functionCodePracticeSchema = z.object({
   type: z.literal('function'),
   id: z.string().min(1),
   title: z.string().min(1),
+  language: z.enum(['javascript', 'python']).default('javascript'),
   functionSignature: z.string().min(1),
   description: z.string(),
   testSuite: z.array(testCaseSchema).min(1),
@@ -103,4 +104,4 @@ export const courseSchema = z.object({
 
 export type CourseInput = z.infer<typeof courseSchema>
 
-export const courseJsonSchema = z.toJSONSchema(courseSchema)
+export const courseJsonSchema = z.toJSONSchema(courseSchema, { io: 'input' })

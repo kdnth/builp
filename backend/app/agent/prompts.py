@@ -13,6 +13,12 @@ from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 
 from app.agent.llm import SupportedProvider, cached_system_message
 from app.agent.schemas import CourseOverview, LessonContent, UnitOutline, UnitSummary
+from app.schemas.course import CodeLanguage
+
+LANGUAGE_NAMES: dict[CodeLanguage, str] = {
+    "javascript": "JavaScript",
+    "python": "Python",
+}
 
 
 def _feedback_block(feedback: str | None) -> str:
@@ -60,11 +66,17 @@ only unit-level scope."""
 
 
 def overview_generate_prompt(
-    *, topic: str, audience: str, num_units: int, feedback: str | None
+    *,
+    topic: str,
+    audience: str,
+    num_units: int,
+    language: CodeLanguage,
+    feedback: str | None,
 ) -> list[BaseMessage]:
     human = (
         f"Topic: {topic}\n"
         f"Audience: {audience}\n"
+        f"Programming language: {LANGUAGE_NAMES[language]}\n"
         f"Number of units: exactly {num_units}. Not fewer, not more.\n"
         "Produce the course overview." + _feedback_block(feedback)
     )
@@ -107,6 +119,7 @@ def unit_outline_generate_prompt(
     overview: CourseOverview,
     unit: UnitSummary,
     lessons_per_unit: int,
+    language: CodeLanguage,
     feedback: str | None,
     provider: SupportedProvider,
 ) -> list[BaseMessage]:
@@ -116,6 +129,7 @@ def unit_outline_generate_prompt(
     )
     human = (
         f'Write the outline for this unit: "{unit.title}" - {unit.goal}\n'
+        f"Programming language: {LANGUAGE_NAMES[language]}\n"
         f"Exactly {lessons_per_unit} lessons. Not fewer, not more."
         + _feedback_block(feedback)
     )
@@ -152,34 +166,54 @@ def unit_outline_evaluate_prompt(
 
 # --- Stage 3: lesson content (one call per lesson) ------------------------
 
-LESSON_CONTENT_SYSTEM = """You write the full content for one lesson: a \
-written explanation in markdown, an optional runnable code practice, and \
-1-3 interactive activities that check understanding of the lesson's goal.
+_CODE_PRACTICE_RULES: dict[CodeLanguage, str] = {
+    "javascript": """For a code practice: write function_signature as a plain \
+call like 'add(a, b)' or 'isPalindrome(s)'. Write reference_solution as a \
+complete, correct JavaScript function implementing it, e.g. \
+'function add(a, b) { return a + b }' - this is used only to verify your \
+test suite is internally consistent, and is never shown to the learner. \
+Write at least 2 test cases that a correct solution would pass, including \
+at least one edge case.""",
+    "python": """For a code practice: write function_signature as a plain \
+call with snake_case names, like 'add(a, b)' or 'is_palindrome(s)'. Write \
+reference_solution as a complete, correct Python function implementing \
+it, e.g. 'def add(a, b):\\n    return a + b'. Use only the standard library, \
+and do not read input or files. This is used only to verify your test \
+suite is internally consistent, and is never shown to the learner. Write \
+at least 2 test cases that a correct solution would pass, including at \
+least one edge case.
 
-For a code practice: write function_signature as a plain call like \
-'add(a, b)'. Write reference_solution as a complete, correct JavaScript \
-function implementing it, e.g. 'function add(a, b) { return a + b }' - \
-this is used only to verify your test suite is internally consistent, and \
-is never shown to the learner. Write at least 2 test cases that a correct \
-solution would pass, including at least one edge case.
+The function must return a JSON-compatible value: a number, string, bool, \
+None, list, or dict with string keys. Do not return a tuple, set, or \
+custom object, and do not return NaN or infinity. The learner's result is \
+compared as JSON, so 2.0 matches an expected 2, and dict keys must be in \
+the same order as in expected_output.""",
+}
+
+_LESSON_CONTENT_SYSTEM_TEMPLATE = """You write the full content for one \
+lesson: a written explanation in markdown, an optional runnable code \
+practice, and 1-3 interactive activities that check understanding of the \
+lesson's goal. Write every code example in {language}.
+
+{code_practice_rules}
 
 Critical constraint: encode every test-case argument and expected_output \
 as a JSON string (for example '3', '"hello"', 'true', 'null', '[1, 2]', \
-'{"a": 1}'). After decoding, each value must be plain JSON (number, \
+'{{"a": 1}}'). After decoding, each value must be plain JSON (number, \
 string, boolean, array, object, or null). Never a function, and never a \
 string containing code meant to be parsed as a function (like \
-'(n) => n * 2') - test cases are run by calling the solution directly with \
-these exact values, so a stringified callback would just be passed as a \
-literal string, not called. This means: do not write a code practice \
-whose parameters need to be functions (no 'array.map'-style callback \
-parameters, no comparator functions). Pick a function signature for this \
-lesson's concept that only needs plain data values as arguments, even if \
-the lesson's written content and interactive activities do cover \
-callbacks.
+'(n) => n * 2' or 'lambda n: n * 2') - test cases are run by calling the \
+solution directly with these exact values, so a stringified callback \
+would just be passed as a literal string, not called. This means: do not \
+write a code practice whose parameters need to be functions (no \
+map-style callback parameters, no comparator functions). Pick a function \
+signature for this lesson's concept that only needs plain data values as \
+arguments, even if the lesson's written content and interactive \
+activities do cover callbacks.
 
 For a fillBlank activity: write text with each blank as the literal \
-token {{blank}}, and provide one entry in blanks for each token, in the \
-same order they appear in the text.
+token {{{{blank}}}}, and provide one entry in blanks for each token, in \
+the same order they appear in the text.
 
 For a multipleChoice activity: wrong options should be plausible, not \
 obviously silly.
@@ -189,18 +223,26 @@ Every activity should actually test the lesson's specific goal, not \
 generic trivia."""
 
 
+def lesson_content_system(language: CodeLanguage) -> str:
+    return _LESSON_CONTENT_SYSTEM_TEMPLATE.format(
+        language=LANGUAGE_NAMES[language],
+        code_practice_rules=_CODE_PRACTICE_RULES[language],
+    )
+
+
 def lesson_content_generate_prompt(
     *,
     overview: CourseOverview,
     unit: UnitSummary,
     outline: UnitOutline,
     lesson_index: int,
+    language: CodeLanguage,
     feedback: str | None,
     provider: SupportedProvider,
 ) -> list[BaseMessage]:
     lesson = outline.lessons[lesson_index]
     context = (
-        f"{LESSON_CONTENT_SYSTEM}\n\n"
+        f"{lesson_content_system(language)}\n\n"
         f"Course audience: {overview.audience}\n\n"
         f"{render_unit_outline(unit, outline)}"
     )
@@ -245,12 +287,14 @@ def lesson_content_evaluate_prompt(
     unit: UnitSummary,
     outline: UnitOutline,
     lesson_index: int,
+    language: CodeLanguage,
     content: LessonContent,
     provider: SupportedProvider,
 ) -> list[BaseMessage]:
     lesson = outline.lessons[lesson_index]
     context = (
         f"{LESSON_CONTENT_EVAL_SYSTEM}\n\n"
+        f"Course programming language: {LANGUAGE_NAMES[language]}\n"
         f"Course audience: {overview.audience}\n\n"
         f"{render_unit_outline(unit, outline)}"
     )

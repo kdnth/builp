@@ -1,7 +1,9 @@
 from app.agent.graph import build_graph, run_generation
 from app.agent.schemas import (
     CourseOverview,
+    GeneratedFunctionPractice,
     GeneratedMultipleChoiceActivity,
+    GeneratedTestCase,
     LessonContent,
     LessonSummary,
     UnitOutline,
@@ -10,7 +12,7 @@ from app.agent.schemas import (
 from app.agent.stage import StageOutcome
 
 
-def _passing_overview(*, topic, audience, num_units, model_config):
+def _passing_overview(*, topic, audience, num_units, language, model_config):
     overview = CourseOverview(
         title=f"Learn {topic}",
         description="A course.",
@@ -23,7 +25,7 @@ def _passing_overview(*, topic, audience, num_units, model_config):
     return StageOutcome(content=overview, passed=True, attempts=[])
 
 
-def _passing_unit_outline(*, overview, unit, lessons_per_unit, model_config):
+def _passing_unit_outline(*, overview, unit, lessons_per_unit, language, model_config):
     outline = UnitOutline(
         lessons=[
             LessonSummary(
@@ -38,7 +40,9 @@ def _passing_unit_outline(*, overview, unit, lessons_per_unit, model_config):
     return StageOutcome(content=outline, passed=True, attempts=[])
 
 
-def _passing_lesson_content(*, overview, unit, outline, lesson_index, model_config):
+def _passing_lesson_content(
+    *, overview, unit, outline, lesson_index, language, model_config
+):
     content = LessonContent(
         written_lesson_markdown=f"# {outline.lessons[lesson_index].title}",
         code_practice=None,
@@ -103,7 +107,9 @@ def test_graph_result_validates_against_the_real_course_schema():
 
 
 def test_graph_handles_uneven_lesson_counts_per_unit():
-    def variable_unit_outline(*, overview, unit, lessons_per_unit, model_config):
+    def variable_unit_outline(
+        *, overview, unit, lessons_per_unit, language, model_config
+    ):
         # unit N gets N lessons, not a fixed count
         count = int(unit.title.split()[-1])
         outline = UnitOutline(
@@ -133,3 +139,61 @@ def test_graph_handles_uneven_lesson_counts_per_unit():
     )
 
     assert [len(unit.lessons) for unit in course.units] == [1, 2, 3]
+
+
+def test_graph_passes_language_to_every_stage_and_the_assembled_course():
+    seen: list[tuple[str, str]] = []
+
+    def overview_fn(**kwargs):
+        seen.append(("overview", kwargs["language"]))
+        return _passing_overview(**kwargs)
+
+    def unit_outline_fn(**kwargs):
+        seen.append(("unit", kwargs["language"]))
+        outline = _passing_unit_outline(**kwargs).content
+        for lesson in outline.lessons:
+            lesson.include_code_practice = True
+        return StageOutcome(content=outline, passed=True, attempts=[])
+
+    def lesson_content_fn(**kwargs):
+        seen.append(("lesson", kwargs["language"]))
+        content = LessonContent(
+            written_lesson_markdown="# Adding",
+            code_practice=GeneratedFunctionPractice(
+                title="Add",
+                function_signature="add(a, b)",
+                description="Add two numbers.",
+                reference_solution="def add(a, b):\n    return a + b",
+                test_suite=[
+                    GeneratedTestCase(input=[1, 2], expected_output=3),
+                    GeneratedTestCase(input=[5, 5], expected_output=10),
+                ],
+            ),
+            interactive_activities=[],
+        )
+        return StageOutcome(content=content, passed=True, attempts=[])
+
+    graph = build_graph(
+        overview_fn=overview_fn,
+        unit_outline_fn=unit_outline_fn,
+        lesson_content_fn=lesson_content_fn,
+    )
+    course = run_generation(
+        topic="testing",
+        audience="beginners",
+        num_units=2,
+        lessons_per_unit=2,
+        language="python",
+        graph=graph,
+    )
+
+    assert {language for _, language in seen} == {"python"}
+    assert [stage for stage, _ in seen].count("lesson") == 4
+    practices = [
+        practice
+        for unit in course.units
+        for lesson in unit.lessons
+        for practice in lesson.codePractices
+    ]
+    assert len(practices) == 4
+    assert {practice.language for practice in practices} == {"python"}

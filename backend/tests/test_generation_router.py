@@ -43,6 +43,38 @@ def test_create_generation_job_defaults(client):
     assert body["lessons_per_unit"] == 3
 
 
+def test_create_generation_job_language_defaults_to_javascript(client):
+    with patch("app.routers.generation.run_generation_job"):
+        response = client.post(
+            "/api/generation-jobs", json={"topic": "x", "audience": "y"}
+        )
+    assert response.json()["language"] == "javascript"
+
+
+def test_create_generation_job_keeps_python_language(client, db_session):
+    with patch("app.routers.generation.run_generation_job"):
+        response = client.post(
+            "/api/generation-jobs",
+            json=_base_generation_payload(language="python"),
+        )
+    body = response.json()
+    assert body["language"] == "python"
+    assert db_session.get(GenerationJob, body["id"]).language == "python"
+    assert client.get(f"/api/generation-jobs/{body['id']}").json()["language"] == (
+        "python"
+    )
+
+
+def test_create_generation_job_rejects_unknown_language(client):
+    with patch("app.routers.generation.run_generation_job") as run_job:
+        response = client.post(
+            "/api/generation-jobs",
+            json=_base_generation_payload(language="ruby"),
+        )
+    assert response.status_code == 422
+    run_job.assert_not_called()
+
+
 def test_get_generation_job_not_found(client):
     response = client.get("/api/generation-jobs/does-not-exist")
     assert response.status_code == 404

@@ -79,6 +79,9 @@ class GenerationJob(Base):
     audience: Mapped[str] = mapped_column(String, nullable=False)
     num_units: Mapped[int] = mapped_column(Integer, nullable=False)
     lessons_per_unit: Mapped[int] = mapped_column(Integer, nullable=False)
+    language: Mapped[str] = mapped_column(
+        String, nullable=False, default="javascript", server_default="javascript"
+    )
       
     course_id: Mapped[str | None] = mapped_column(
         ForeignKey("courses.id", ondelete="SET NULL"), nullable=True

@@ -89,7 +89,7 @@ export default function LessonComponent({
             label={page.title}
             description={getViewTypeString(page)}
           >
-            <Box mt="md">
+            <Box key={page.id} mt="md">
               <LessonViewRenderer
                 view={page}
                 onInteractivePracticeComplete={handlePracticeComplete}

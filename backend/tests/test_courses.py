@@ -1,3 +1,6 @@
+from app.models import Course as CourseModel
+
+
 def test_list_courses_starts_empty(client):
     response = client.get("/api/courses")
     assert response.status_code == 200
@@ -44,6 +47,49 @@ def test_create_course_rejects_bad_discriminator(client, sample_course):
     sample_course["units"][0]["lessons"][0]["interactivePractices"][0]["activities"][0][
         "type"
     ] = "notAType"
+    response = client.post("/api/courses", json=sample_course)
+    assert response.status_code == 422
+
+
+def _first_code_practice(course: dict) -> dict:
+    return course["units"][0]["lessons"][0]["codePractices"][0]
+
+
+def test_function_practice_language_defaults_to_javascript(client, sample_course):
+    course_id = client.post("/api/courses", json=sample_course).json()["id"]
+    fetched = client.get(f"/api/courses/{course_id}").json()
+    assert _first_code_practice(fetched)["language"] == "javascript"
+
+
+def test_function_practice_keeps_python_language(client, sample_course, db_session):
+    _first_code_practice(sample_course)["language"] = "python"
+    course_id = client.post("/api/courses", json=sample_course).json()["id"]
+
+    stored = db_session.get(CourseModel, course_id)
+    assert _first_code_practice(stored.data)["language"] == "python"
+    fetched = client.get(f"/api/courses/{course_id}").json()
+    assert _first_code_practice(fetched)["language"] == "python"
+
+
+def test_stored_course_without_language_reads_as_javascript(
+    client, sample_course, db_session
+):
+    db_session.add(
+        CourseModel(
+            id=sample_course["id"],
+            title=sample_course["title"],
+            data=sample_course,
+            owner_user_id=None,
+        )
+    )
+    db_session.commit()
+
+    fetched = client.get(f"/api/courses/{sample_course['id']}").json()
+    assert _first_code_practice(fetched)["language"] == "javascript"
+
+
+def test_create_course_rejects_unknown_language(client, sample_course):
+    _first_code_practice(sample_course)["language"] = "ruby"
     response = client.post("/api/courses", json=sample_course)
     assert response.status_code == 422
 

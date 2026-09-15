@@ -27,7 +27,7 @@ from app.agent.assemble import assemble_course, assemble_lesson
 from app.agent.llm import GenerationModelConfig, default_free_credit_model_config
 from app.agent.schemas import CourseOverview, LessonContent, UnitOutline, UnitSummary
 from app.agent.stage import StageOutcome
-from app.schemas.course import Course, Lesson
+from app.schemas.course import CodeLanguage, Course, Lesson
 
 OverviewFn = Callable[..., StageOutcome[CourseOverview]]
 UnitOutlineFn = Callable[..., StageOutcome[UnitOutline]]
@@ -53,6 +53,7 @@ class GenerationState(TypedDict):
     audience: str
     num_units: int
     lessons_per_unit: int
+    language: CodeLanguage
     model_config: GenerationModelConfig
     overview: CourseOverview
     overview_passed: bool
@@ -72,6 +73,7 @@ def build_graph(
             topic=state["topic"],
             audience=state["audience"],
             num_units=state["num_units"],
+            language=state["language"],
             model_config=state["model_config"],
         )
         overview = outcome.content
@@ -85,6 +87,7 @@ def build_graph(
                         "unit_index": index,
                         "unit": unit,
                         "lessons_per_unit": state["lessons_per_unit"],
+                        "language": state["language"],
                         "model_config": state["model_config"],
                     },
                 )
@@ -97,6 +100,7 @@ def build_graph(
             overview=payload["overview"],
             unit=payload["unit"],
             lessons_per_unit=payload["lessons_per_unit"],
+            language=payload["language"],
             model_config=payload["model_config"],
         )
         outline = outcome.content
@@ -117,6 +121,7 @@ def build_graph(
                         "unit_index": payload["unit_index"],
                         "outline": outline,
                         "lesson_index": lesson_index,
+                        "language": payload["language"],
                         "model_config": payload["model_config"],
                     },
                 )
@@ -130,10 +135,11 @@ def build_graph(
             unit=payload["unit"],
             outline=payload["outline"],
             lesson_index=payload["lesson_index"],
+            language=payload["language"],
             model_config=payload["model_config"],
         )
         lesson_title = payload["outline"].lessons[payload["lesson_index"]].title
-        lesson = assemble_lesson(lesson_title, outcome.content)
+        lesson = assemble_lesson(lesson_title, outcome.content, payload["language"])
         record: LessonRecord = {
             "unit_index": payload["unit_index"],
             "lesson_index": payload["lesson_index"],
@@ -177,6 +183,7 @@ def run_generation(
     audience: str,
     num_units: int,
     lessons_per_unit: int,
+    language: CodeLanguage = "javascript",
     model_config: GenerationModelConfig | None = None,
     graph: CompiledStateGraph | None = None,
 ) -> Course:
@@ -187,6 +194,7 @@ def run_generation(
             "audience": audience,
             "num_units": num_units,
             "lessons_per_unit": lessons_per_unit,
+            "language": language,
             "model_config": model_config or default_free_credit_model_config(),
             "unit_outlines": [],
             "lesson_records": [],
