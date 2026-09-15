@@ -6,16 +6,19 @@ from app.auth import AuthenticatedUser, get_current_user
 from app.database import get_db
 from app.models import Course as CourseModel
 from app.models import LessonProgress
+from app.routers.courses import is_course_saved_by
 from app.schemas.progress import LessonCompleteResponse, ProgressResponse
 
 router = APIRouter(prefix="/api/courses/{course_id}/progress", tags=["progress"])
 
 
-def _ensure_course_exists(db: Session, course_id: str) -> None:
-    if db.get(CourseModel, course_id) is None:
+def _ensure_course_exists(db: Session, course_id: str) -> CourseModel:
+    row = db.get(CourseModel, course_id)
+    if row is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Course not found."
         )
+    return row
 
 
 @router.get("", response_model=ProgressResponse)
@@ -44,7 +47,12 @@ def complete_lesson(
     db: Session = Depends(get_db),
     user: AuthenticatedUser = Depends(get_current_user),
 ) -> LessonCompleteResponse:
-    _ensure_course_exists(db, course_id)
+    course = _ensure_course_exists(db, course_id)
+    if not is_course_saved_by(db, course, user.id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Save this course to My Courses before you make progress on it.",
+        )
 
     existing = db.scalar(
         select(LessonProgress).where(

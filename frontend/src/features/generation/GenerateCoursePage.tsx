@@ -50,7 +50,8 @@ export default function GenerateCoursePage() {
   const [numUnits, setNumUnits] = useState(3)
   const [lessonsPerUnit, setLessonsPerUnit] = useState(3)
   const [language, setLanguage] = useState<CodeLanguage>('javascript')
-  const [generationMode, setGenerationMode] = useState<GenerationMode>('free_credit')
+  const [generationMode, setGenerationMode] =
+    useState<GenerationMode>('free_credit')
   const [providerApiKey, setProviderApiKey] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -128,13 +129,13 @@ export default function GenerateCoursePage() {
           <Stack gap="md">
             <Stack gap={4}>
               <Anchor component={Link} to="/" size="sm">
-                ← All courses
+                ← My courses
               </Anchor>
               <Title order={2}>Generate a course</Title>
               <Text c="dimmed" size="sm">
                 Describe a topic and audience. This writes a full course:
-                lessons, code practice, and interactive activities. It takes
-                a minute or two.
+                lessons, code practice, and interactive activities. It takes a
+                minute or two.
               </Text>
             </Stack>
             <Stack gap={4}>
@@ -198,14 +199,17 @@ export default function GenerateCoursePage() {
             )}
             <Alert radius="md" color="blue">
               If you use your own API key, it is held in memory for this
-              generation request only and is never written to the database or logs.
+              generation request only and is never written to the database or
+              logs.
             </Alert>
             <NumberInput
               label="Units"
               min={1}
               max={10}
               value={numUnits}
-              onChange={(value) => setNumUnits(typeof value === 'number' ? value : 1)}
+              onChange={(value) =>
+                setNumUnits(typeof value === 'number' ? value : 1)
+              }
             />
             <NumberInput
               label="Lessons per unit"
@@ -217,7 +221,11 @@ export default function GenerateCoursePage() {
               }
             />
             {error && (
-              <Alert color="red" icon={<WarningCircleIcon weight="fill" />} radius="md">
+              <Alert
+                color="red"
+                icon={<WarningCircleIcon weight="fill" />}
+                radius="md"
+              >
                 {error}
               </Alert>
             )}

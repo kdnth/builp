@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
+  Alert,
   Anchor,
   Badge,
   Button,
@@ -18,6 +19,7 @@ import {
 } from '@mantine/core'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import {
+  BookmarkSimpleIcon,
   CheckCircleIcon,
   CircleIcon,
   LockIcon,
@@ -27,7 +29,13 @@ import {
 import { useCourse } from '../../hooks/useCourse'
 import { useCourseProgressContext } from '../../hooks/CourseProgressContext'
 import { useAuthSession } from '../../lib/auth'
-import { updateCourseTags } from '../../lib/api'
+import {
+  ApiError,
+  saveCourse,
+  unsaveCourse,
+  updateCourseTags,
+} from '../../lib/api'
+import UnsaveCourseModal from './UnsaveCourseModal'
 import { downloadCourseJson } from '../../lib/downloadCourseJson'
 import { hasCompletedTour, useTour } from '../tour/TourContext'
 import type { TourStep } from '../tour/TourContext'
@@ -112,14 +120,51 @@ export default function CourseTreePage() {
   const { courseId } = useParams<{ courseId: string }>()
   const { course, setCourse, loading, notFound } = useCourse(courseId)
   const session = useAuthSession()
-  const { completedLessonIds } = useCourseProgressContext()
+  const { completedLessonIds, resetProgress } = useCourseProgressContext()
   const { start } = useTour()
+  const [savingCourse, setSavingCourse] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [unsaveConfirmOpen, setUnsaveConfirmOpen] = useState(false)
 
   useEffect(() => {
     if (!loading && course && !hasCompletedTour(COURSE_TREE_TOUR_ID)) {
       start(COURSE_TREE_TOUR_ID, courseTreeTourSteps)
     }
   }, [loading, course, start])
+
+  async function handleSaveCourse() {
+    if (!course) return
+    setSaveError(null)
+    setSavingCourse(true)
+    try {
+      await saveCourse(course.id)
+      setCourse({ ...course, saved: true })
+    } catch (err) {
+      setSaveError(
+        err instanceof ApiError ? err.message : 'Could not save this course.',
+      )
+    } finally {
+      setSavingCourse(false)
+    }
+  }
+
+  async function handleUnsaveCourse() {
+    if (!course) return
+    setSaveError(null)
+    setSavingCourse(true)
+    try {
+      await unsaveCourse(course.id)
+      resetProgress()
+      setCourse({ ...course, saved: false })
+    } catch (err) {
+      setSaveError(
+        err instanceof ApiError ? err.message : 'Could not unsave this course.',
+      )
+    } finally {
+      setSavingCourse(false)
+      setUnsaveConfirmOpen(false)
+    }
+  }
 
   if (notFound) {
     return <Navigate to="/" replace />
@@ -134,6 +179,7 @@ export default function CourseTreePage() {
   }
 
   const isOwner = session.data?.user.id === course.owner_user_id
+  const isSignedIn = !session.isPending && session.data != null
 
   const completed = countCompletedLessons(completedLessonIds, course)
   const total = countTotalLessons(course)
@@ -145,9 +191,25 @@ export default function CourseTreePage() {
         <Stack gap={4}>
           <Group justify="space-between">
             <Anchor component={Link} to="/" size="sm">
-              ← All courses
+              ← My courses
             </Anchor>
             <Group gap="xs">
+              {course.saved && !isOwner && (
+                <Button
+                  size="sm"
+                  variant="default"
+                  onClick={() => setUnsaveConfirmOpen(true)}
+                >
+                  <BookmarkSimpleIcon size={16} weight="fill" />
+                </Button>
+              )}
+              <Button
+                data-tour="course-download"
+                size="sm"
+                onClick={() => downloadCourseJson(course)}
+              >
+                Download course JSON
+              </Button>
               <ActionIcon
                 variant="light"
                 radius="xl"
@@ -156,13 +218,6 @@ export default function CourseTreePage() {
               >
                 <QuestionIcon size={20} />
               </ActionIcon>
-              <Button
-                data-tour="course-download"
-                size="sm"
-                onClick={() => downloadCourseJson(course)}
-              >
-                Download course JSON
-              </Button>
             </Group>
           </Group>
           <Group justify="space-between" align="center">
@@ -173,6 +228,61 @@ export default function CourseTreePage() {
           </Group>
           <Progress data-tour="course-progress" value={percent} radius="xl" />
         </Stack>
+
+        {course.saved && saveError && (
+          <Text size="sm" c="red">
+            {saveError}
+          </Text>
+        )}
+
+        <UnsaveCourseModal
+          opened={unsaveConfirmOpen}
+          courseTitle={course.title}
+          working={savingCourse}
+          onCancel={() => setUnsaveConfirmOpen(false)}
+          onConfirm={() => void handleUnsaveCourse()}
+        />
+
+        {!course.saved && (
+          <Alert
+            color="primary"
+            variant="light"
+            radius="md"
+            icon={<BookmarkSimpleIcon size={20} />}
+            title={
+              isSignedIn
+                ? 'Save this course to start learning'
+                : 'Sign in to start learning'
+            }
+          >
+            <Stack gap="sm" align="flex-start">
+              <Text size="sm">
+                {isSignedIn
+                  ? 'Save the course to view lessons and track your progress.'
+                  : 'Sign in and save the course to view lessons and track your progress.'}
+              </Text>
+              {isSignedIn ? (
+                <Button
+                  size="sm"
+                  leftSection={<BookmarkSimpleIcon size={16} />}
+                  loading={savingCourse}
+                  onClick={() => void handleSaveCourse()}
+                >
+                  Save to My Courses
+                </Button>
+              ) : (
+                <Button size="sm" component={Link} to="/sign-in">
+                  Sign in
+                </Button>
+              )}
+              {saveError && (
+                <Text size="sm" c="red">
+                  {saveError}
+                </Text>
+              )}
+            </Stack>
+          </Alert>
+        )}
 
         <div data-tour="course-tags">
           {isOwner ? (
@@ -194,20 +304,20 @@ export default function CourseTreePage() {
 
         <Stack data-tour="course-units" gap="sm">
           {course.units.map((unit, unitIndex) => {
-            const unlocked = isUnitUnlocked(
-              completedLessonIds,
-              course,
-              unitIndex,
-            )
+            const unlocked =
+              course.saved &&
+              isUnitUnlocked(completedLessonIds, course, unitIndex)
             const complete = isUnitComplete(completedLessonIds, unit)
             const completedInUnit = unit.lessons.filter((lesson) =>
               isLessonComplete(completedLessonIds, lesson.id),
             ).length
 
             const label = unit.title
-            const description = unlocked
-              ? `${completedInUnit}/${unit.lessons.length} lessons complete`
-              : 'Complete prerequisites to start unit'
+            const description = !course.saved
+              ? `${unit.lessons.length} lesson${unit.lessons.length === 1 ? '' : 's'}`
+              : unlocked
+                ? `${completedInUnit}/${unit.lessons.length} lessons complete`
+                : 'Complete prerequisites to start unit'
             const leftSection = complete ? (
               <CheckCircleIcon
                 size={20}

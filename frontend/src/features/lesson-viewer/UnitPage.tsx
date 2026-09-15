@@ -23,7 +23,7 @@ export default function UnitPage() {
   }
 
   const unitIndex = course.units.findIndex((u) => u.id === unitId)
-  if (unitIndex === -1) {
+  if (unitIndex === -1 || !course.saved) {
     return <Navigate to={`/courses/${course.id}`} replace />
   }
 
