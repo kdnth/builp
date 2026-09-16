@@ -36,12 +36,30 @@ class Settings(BaseSettings):
     neon_auth_jwks_url: str | None = None
     neon_auth_issuer: str | None = None
 
+    # Transactional email (Resend). Unset means feedback is stored but no
+    # mail goes out - see app/email.py.
+    resend_api_key: str | None = None
+    feedback_from_email: str = "builp <noreply@kdnth.co>"
+    support_email: str = "support@kdnth.co"
+    contact_email: str = "hello@kdnth.co"
+
+    # Used to build course links inside notification emails.
+    app_base_url: str = "https://builp.kdnth.co"
+
     @property
     def auth_configured(self) -> bool:
         return bool(self.neon_auth_url or self.neon_auth_jwks_url)
 
+    @property
+    def email_configured(self) -> bool:
+        return bool(self.resend_api_key)
+
     @field_validator(
-        "neon_auth_url", "neon_auth_jwks_url", "neon_auth_issuer", mode="before"
+        "neon_auth_url",
+        "neon_auth_jwks_url",
+        "neon_auth_issuer",
+        "resend_api_key",
+        mode="before",
     )
     @classmethod
     def _blank_env_as_none(cls, value: object) -> object:

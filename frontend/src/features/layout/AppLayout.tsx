@@ -22,8 +22,10 @@ import {
   SunIcon,
 } from '@phosphor-icons/react'
 import AuthStatus from './AuthStatus'
+import AppFooter from './AppFooter'
 import GenerationJobIndicator from '../generation/GenerationJobIndicator'
 import GenerationJobsWatcher from '../generation/GenerationJobsWatcher'
+import NotificationBell from '../notifications/NotificationBell'
 import logo from '../../assets/logo.png'
 
 const navItems = [
@@ -110,6 +112,7 @@ export default function AppLayout() {
           </Group>
           <Group gap="sm" wrap="nowrap">
             <GenerationJobIndicator />
+            <NotificationBell />
             <Box visibleFrom="sm">
               <AuthStatus />
             </Box>
@@ -135,6 +138,7 @@ export default function AppLayout() {
       </AppShell.Navbar>
       <AppShell.Main>
         <Outlet />
+        <AppFooter />
       </AppShell.Main>
       <GenerationJobsWatcher />
       <Notifications position="bottom-right" />

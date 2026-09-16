@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.routers import courses, generation, progress
+from app.routers import courses, feedback, generation, notifications, progress
 
 settings = get_settings()
 
@@ -19,6 +19,8 @@ app.add_middleware(
 app.include_router(courses.router)
 app.include_router(progress.router)
 app.include_router(generation.router)
+app.include_router(feedback.router)
+app.include_router(notifications.router)
 
 
 @app.get("/health")

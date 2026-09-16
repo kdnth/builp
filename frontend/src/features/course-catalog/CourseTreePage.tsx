@@ -25,6 +25,7 @@ import {
   LockIcon,
   QuestionIcon,
   TagIcon,
+  WarningIcon,
 } from '@phosphor-icons/react'
 import { useCourse } from '../../hooks/useCourse'
 import { useCourseProgressContext } from '../../hooks/CourseProgressContext'
@@ -36,6 +37,7 @@ import {
   updateCourseTags,
 } from '../../lib/api'
 import UnsaveCourseModal from './UnsaveCourseModal'
+import ReportCourseModal from '../feedback/ReportCourseModal'
 import { downloadCourseJson } from '../../lib/downloadCourseJson'
 import { hasCompletedTour, useTour } from '../tour/TourContext'
 import type { TourStep } from '../tour/TourContext'
@@ -125,6 +127,7 @@ export default function CourseTreePage() {
   const [savingCourse, setSavingCourse] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [unsaveConfirmOpen, setUnsaveConfirmOpen] = useState(false)
+  const [reportOpen, setReportOpen] = useState(false)
 
   useEffect(() => {
     if (!loading && course && !hasCompletedTour(COURSE_TREE_TOUR_ID)) {
@@ -203,6 +206,17 @@ export default function CourseTreePage() {
                   <BookmarkSimpleIcon size={16} weight="fill" />
                 </Button>
               )}
+              {isSignedIn && !isOwner && (
+                <Button
+                  size="sm"
+                  variant="subtle"
+                  color="gray"
+                  leftSection={<WarningIcon size={16} />}
+                  onClick={() => setReportOpen(true)}
+                >
+                  Report a problem
+                </Button>
+              )}
               <Button
                 data-tour="course-download"
                 size="sm"
@@ -241,6 +255,13 @@ export default function CourseTreePage() {
           working={savingCourse}
           onCancel={() => setUnsaveConfirmOpen(false)}
           onConfirm={() => void handleUnsaveCourse()}
+        />
+
+        <ReportCourseModal
+          opened={reportOpen}
+          onClose={() => setReportOpen(false)}
+          courseId={course.id}
+          courseTitle={course.title}
         />
 
         {!course.saved && (

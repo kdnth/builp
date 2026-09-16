@@ -31,6 +31,15 @@ def _clean_database() -> Iterator[None]:
     Base.metadata.drop_all(_engine)
 
 
+@pytest.fixture(autouse=True)
+def _background_session_factory(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Feedback email delivery runs in a BackgroundTask, after the
+    # request-scoped session from get_db is closed, so it opens its own from
+    # the app-wide factory. Point that at the test database too, or the task
+    # writes to whatever DATABASE_URL happens to be configured.
+    monkeypatch.setattr("app.routers.feedback.SessionLocal", _TestingSessionLocal)
+
+
 def _override_get_db() -> Iterator:
     session = _TestingSessionLocal()
     try:

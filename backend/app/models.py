@@ -1,6 +1,16 @@
 from datetime import UTC, datetime
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -97,4 +107,55 @@ class GenerationJob(Base):
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
+    )
+
+
+class FeedbackSubmission(Base):
+    """A contact message, or a problem report against one course. This is the
+    durable record of what someone submitted, kept whether or not the
+    notification email reached an inbox."""
+
+    __tablename__ = "feedback_submissions"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    kind: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    category: Mapped[str | None] = mapped_column(String, nullable=True)
+    subject: Mapped[str] = mapped_column(String, nullable=False)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+
+    # Null when a signed-out visitor uses the contact form.
+    submitter_user_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    submitter_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    submitter_email: Mapped[str | None] = mapped_column(String, nullable=True)
+    # Rate limiting only. See app/routers/feedback.py.
+    submitter_ip: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+
+    course_id: Mapped[str | None] = mapped_column(
+        ForeignKey("courses.id", ondelete="SET NULL"), nullable=True
+    )
+    email_delivered: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=text("false")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, index=True
+    )
+
+
+class Notification(Base):
+    """An in-app message for one user, read through the header bell."""
+
+    __tablename__ = "notifications"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    user_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    kind: Mapped[str] = mapped_column(String, nullable=False)
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    # Relative app path the bell entry links to, e.g. /courses/abc123.
+    link: Mapped[str | None] = mapped_column(String, nullable=True)
+    read_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, index=True
     )

@@ -10,6 +10,7 @@ import SignUpPage from './features/auth/SignUpPage'
 import VerifyEmailPage from './features/auth/VerifyEmailPage'
 import ForgotPasswordPage from './features/auth/ForgotPasswordPage'
 import ResetPasswordPage from './features/auth/ResetPasswordPage'
+import ContactPage from './features/feedback/ContactPage'
 import CourseTreePage from './features/course-catalog/CourseTreePage'
 import ExplorePage from './features/course-catalog/ExplorePage'
 import UploadCoursePage from './features/course-catalog/UploadCoursePage'
@@ -73,6 +74,7 @@ function App() {
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
               <Route path="/reset-password" element={<ResetPasswordPage />} />
               <Route path="/explore" element={<ExplorePage />} />
+              <Route path="/contact" element={<ContactPage />} />
               <Route path="/courses/new" element={<UploadCoursePage />} />
               <Route
                 path="/courses/generate"

@@ -364,3 +364,85 @@ export async function getGenerationJob(jobId: string): Promise<GenerationJob> {
   const response = await authorizedFetch(`/api/generation-jobs/${jobId}`)
   return parseOrThrow(response, 'Could not load generation job.')
 }
+
+// --- Feedback ------------------------------------------------------------
+
+export type ReportCategory =
+  | 'incorrect_content'
+  | 'broken_code_practice'
+  | 'typo_or_formatting'
+  | 'inappropriate_content'
+  | 'other'
+
+export interface ContactInput {
+  name: string
+  email: string
+  subject: string
+  message: string
+}
+
+export interface FeedbackResponse {
+  id: string
+  kind: string
+  created_at: string
+}
+
+export async function submitContactMessage(
+  input: ContactInput,
+): Promise<FeedbackResponse> {
+  const response = await authorizedFetch('/api/feedback/contact', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+  return parseOrThrow(response, 'Could not send your message.')
+}
+
+export async function reportCourseProblem(
+  courseId: string,
+  input: { category: ReportCategory; message: string; lesson_id?: string },
+): Promise<FeedbackResponse> {
+  const response = await authorizedFetch(
+    `/api/feedback/courses/${courseId}/reports`,
+    { method: 'POST', body: JSON.stringify(input) },
+  )
+  return parseOrThrow(response, 'Could not send your report.')
+}
+
+// --- Notifications -------------------------------------------------------
+
+export interface AppNotification {
+  id: string
+  kind: string
+  title: string
+  body: string
+  link: string | null
+  read_at: string | null
+  created_at: string
+}
+
+export interface NotificationList {
+  items: AppNotification[]
+  unread_count: number
+}
+
+export async function listNotifications(): Promise<NotificationList> {
+  const response = await authorizedFetch('/api/notifications')
+  return parseOrThrow(response, 'Could not load notifications.')
+}
+
+export async function markNotificationRead(
+  notificationId: string,
+): Promise<AppNotification> {
+  const response = await authorizedFetch(
+    `/api/notifications/${notificationId}/read`,
+    { method: 'POST' },
+  )
+  return parseOrThrow(response, 'Could not update this notification.')
+}
+
+export async function markAllNotificationsRead(): Promise<void> {
+  const response = await authorizedFetch('/api/notifications/read-all', {
+    method: 'POST',
+  })
+  return parseVoidOrThrow(response, 'Could not update notifications.')
+}

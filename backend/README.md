@@ -71,6 +71,11 @@ starting point, not a guarantee.
   - `generation_mode=free_credit` (default): server-managed provider key, one request per rolling 24-hour window per user.
   - `generation_mode=provider_api_key`: user supplies `provider` (`anthropic`) and `provider_api_key`, and this bypasses the free-credit rate limit.
 - `GET /api/generation-jobs/{job_id}` - poll a generation job's status. Requires auth. Returns the new course's id once it succeeds.
+- `POST /api/feedback/contact` - general contact message. No auth, so signed-out visitors can reach support. Emails `CONTACT_EMAIL`. Capped at 5 submissions per IP per hour.
+- `POST /api/feedback/courses/{course_id}/reports` - report a problem in one course. Requires auth. Emails `SUPPORT_EMAIL`, and writes the course author an in-app notification when that author is someone other than the reporter.
+- `GET /api/notifications` - the signed-in user's newest notifications plus an unread count. Requires auth.
+- `POST /api/notifications/{notification_id}/read` - mark one notification read. Requires auth. Another user's notification returns 404.
+- `POST /api/notifications/read-all` - mark every unread notification read. Requires auth. Returns `204 No Content`.
 
 Course documents are validated against `app/schemas/course.py`, which
 mirrors `frontend/src/schemas/course.ts` field for field. The backend never
@@ -112,3 +117,26 @@ Auth checks for Neon Auth (built on Better Auth, tokens signed with EdDSA /
 Ed25519). See `app/auth.py`. Until `NEON_AUTH_URL` (or `NEON_AUTH_JWKS_URL`)
 is set in `.env`, every auth-protected route returns `503 Auth is not set up
 on the server yet.` instead of trying to verify a token.
+
+## Feedback and notifications
+
+Two channels feed the same `feedback_submissions` table:
+
+- The contact form, which emails `CONTACT_EMAIL` (hello@).
+- Course problem reports, which email `SUPPORT_EMAIL` (support@) and notify
+  the course author in the app.
+
+Every submission is written to the database before any send is attempted, so
+a bounced or unconfigured send loses the email, never the report. Delivery
+runs in a `BackgroundTask` after the response, and flips
+`feedback_submissions.email_delivered` on success. With `RESEND_API_KEY`
+unset, `app/email.py` logs and returns without calling out, which is the
+intended development behavior.
+
+The contact endpoint is the one route here open to signed-out visitors, so it
+caps submissions per client IP (see `_RATE_LIMIT_MAX_SUBMISSIONS` in
+`app/routers/feedback.py`). The IP comes from the first `X-Forwarded-For`
+hop, since the app sits behind a proxy in production.
+
+Notifications are generic rows keyed by `user_id` and `kind`, not specific to
+reports. The header bell polls `GET /api/notifications`.
