@@ -3,6 +3,7 @@
 from app.agent.schemas import (
     CourseBrief,
     CourseOverview,
+    LessonContent,
     LessonProfile,
     LessonSummary,
     UnitOutline,
@@ -64,3 +65,18 @@ def make_outline(*, num_lessons: int = 1, **kwargs) -> UnitOutline:
             for index in range(num_lessons)
         ]
     )
+
+
+def make_lesson_content(
+    *,
+    markdown: str = "# Lesson",
+    activities: list | None = None,
+    code_practice=None,
+    sections: list | None = None,
+) -> LessonContent:
+    """A lesson with one section, unless sections are given."""
+    if sections is None:
+        sections = [
+            {"title": "Section", "markdown": markdown, "activities": activities or []}
+        ]
+    return LessonContent(sections=sections, code_practice=code_practice)

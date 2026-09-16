@@ -5,8 +5,7 @@ from app.agent.prompts import (
     render_course_map,
     unit_outline_generate_prompt,
 )
-from app.agent.schemas import LessonContent
-from tests.factories import make_brief, make_outline, make_overview
+from tests.factories import make_brief, make_lesson_content, make_outline, make_overview
 
 _OVERVIEW = make_overview()
 _UNIT = _OVERVIEW.units[0]
@@ -112,6 +111,7 @@ def test_lesson_prompt_carries_the_brief_the_map_and_the_profile():
             outline=_OUTLINE,
             lesson_index=0,
             course_map=course_map,
+            reading_style="single",
             feedback=None,
             provider="anthropic",
         )
@@ -136,6 +136,7 @@ def test_lesson_prompt_without_code_practice_has_no_code_rules():
             outline=outline,
             lesson_index=0,
             course_map="Course map:",
+            reading_style="interleaved",
             feedback=None,
             provider="anthropic",
         )
@@ -157,8 +158,9 @@ def test_lesson_review_prompt_uses_the_profile_criteria():
             unit=overview.units[0],
             outline=outline,
             lesson_index=0,
-            content=LessonContent(
-                written_lesson_markdown="# hi", interactive_activities=[]
+            content=make_lesson_content(
+                markdown="# hi",
+                activities=[],
             ),
             provider="anthropic",
         )

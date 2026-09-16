@@ -4,15 +4,14 @@ from app.agent.schemas import (
     GeneratedFunctionPractice,
     GeneratedMultipleChoiceActivity,
     GeneratedTestCase,
-    LessonContent,
     UnitSummary,
 )
-from tests.factories import make_overview
+from tests.factories import make_lesson_content, make_overview
 
 
 def test_assemble_lesson_with_code_and_activities():
-    content = LessonContent(
-        written_lesson_markdown="# Adding numbers\nUse `+`.",
+    content = make_lesson_content(
+        markdown="# Adding numbers\nUse `+`.",
         code_practice=GeneratedFunctionPractice(
             title="Add",
             function_signature="add(a, b)",
@@ -23,7 +22,7 @@ def test_assemble_lesson_with_code_and_activities():
                 GeneratedTestCase(input=[5, 5], expected_output=10),
             ],
         ),
-        interactive_activities=[
+        activities=[
             GeneratedMultipleChoiceActivity(
                 question="What does + do?",
                 options=["Adds", "Subtracts"],
@@ -39,41 +38,42 @@ def test_assemble_lesson_with_code_and_activities():
     lesson = assemble_lesson("Addition", content, "javascript")
 
     assert lesson.title == "Addition"
-    assert lesson.writtenLesson.markdown.startswith("# Adding numbers")
-    assert len(lesson.codePractices) == 1
-    assert lesson.codePractices[0].language == "javascript"
-    assert lesson.codePractices[0].testSuite[0].expectedOutput == 3
-    assert len(lesson.interactivePractices) == 1
-    assert len(lesson.interactivePractices[0].activities) == 2
+    # read, then the code practice, then the check
+    assert [page.kind for page in lesson.pages] == ["written", "code", "interactive"]
 
-    fill_blank = lesson.interactivePractices[0].activities[1]
+    written, code, interactive = lesson.pages
+    assert written.written.markdown.startswith("# Adding numbers")
+    assert code.practice.language == "javascript"
+    assert code.practice.testSuite[0].expectedOutput == 3
+    assert len(interactive.practice.activities) == 2
+
+    fill_blank = interactive.practice.activities[1]
     assert fill_blank.blanks[0].position == 0
 
     # every generated id is unique
     ids = [
         lesson.id,
-        lesson.writtenLesson.id,
-        lesson.codePractices[0].id,
-        lesson.interactivePractices[0].id,
-        *[a.id for a in lesson.interactivePractices[0].activities],
+        written.written.id,
+        code.practice.id,
+        interactive.practice.id,
+        *[activity.id for activity in interactive.practice.activities],
     ]
     assert len(ids) == len(set(ids))
 
 
 def test_assemble_lesson_with_no_code_or_activities():
-    content = LessonContent(
-        written_lesson_markdown="# Just reading",
+    content = make_lesson_content(
+        markdown="# Just reading",
         code_practice=None,
-        interactive_activities=[],
+        activities=[],
     )
     lesson = assemble_lesson("Reading", content, "javascript")
-    assert lesson.codePractices == []
-    assert lesson.interactivePractices == []
+    assert [page.kind for page in lesson.pages] == ["written"]
 
 
 def test_assemble_lesson_sets_python_language_on_code_practice():
-    content = LessonContent(
-        written_lesson_markdown="# Adding numbers",
+    content = make_lesson_content(
+        markdown="# Adding numbers",
         code_practice=GeneratedFunctionPractice(
             title="Add",
             function_signature="add(a, b)",
@@ -84,12 +84,13 @@ def test_assemble_lesson_sets_python_language_on_code_practice():
                 GeneratedTestCase(input=[5, 5], expected_output=10),
             ],
         ),
-        interactive_activities=[],
+        activities=[],
     )
 
     lesson = assemble_lesson("Addition", content, "python")
 
-    assert lesson.codePractices[0].language == "python"
+    code = next(page for page in lesson.pages if page.kind == "code")
+    assert code.practice.language == "python"
 
 
 def test_assemble_course_matches_real_schema():
@@ -103,10 +104,10 @@ def test_assemble_course_matches_real_schema():
 
     lesson = assemble_lesson(
         "Lesson",
-        LessonContent(
-            written_lesson_markdown="# hi",
+        make_lesson_content(
+            markdown="# hi",
             code_practice=None,
-            interactive_activities=[],
+            activities=[],
         ),
         "javascript",
     )
@@ -121,3 +122,54 @@ def test_assemble_course_matches_real_schema():
     from app.schemas.course import Course
 
     Course.model_validate(course.model_dump())
+
+
+def test_interleaved_sections_become_read_then_check_pages():
+    content = make_lesson_content(
+        sections=[
+            {
+                "title": "What it is",
+                "markdown": "text",
+                "activities": [
+                    {
+                        "type": "multipleChoice",
+                        "question": "q",
+                        "options": ["a", "b"],
+                        "correct_index": 0,
+                    }
+                ],
+            },
+            {"title": "How to use it", "markdown": "more"},
+        ]
+    )
+
+    lesson = assemble_lesson("Lambdas", content, "python")
+
+    assert [page.kind for page in lesson.pages] == [
+        "written",
+        "interactive",
+        "written",
+    ]
+    assert lesson.pages[0].written.title == "What it is"
+    assert lesson.pages[1].practice.title == "What it is check"
+    assert lesson.pages[2].written.title == "How to use it"
+
+
+def test_lesson_pages_reads_old_and_new_lessons_the_same_way():
+    from app.schemas.course import lesson_pages
+
+    new_lesson = assemble_lesson(
+        "Reading", make_lesson_content(markdown="# Text"), "javascript"
+    )
+    old_lesson = new_lesson.model_copy(
+        update={
+            "pages": None,
+            "writtenLesson": new_lesson.pages[0].written,
+            "codePractices": [],
+            "interactivePractices": [],
+        }
+    )
+
+    assert [page.kind for page in lesson_pages(old_lesson)] == ["written"]
+    assert lesson_pages(old_lesson)[0].written.markdown == "# Text"
+    assert lesson_pages(new_lesson) == new_lesson.pages

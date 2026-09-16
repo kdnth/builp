@@ -8,8 +8,8 @@ from app.agent.schemas import (
     GeneratedFillBlankActivity,
     GeneratedMatchingActivity,
     GeneratedMultipleChoiceActivity,
-    LessonContent,
 )
+from tests.factories import make_lesson_content
 
 
 def _fill_blank(text: str, accepted: list[list[str]], description: str = "Fill in."):
@@ -151,10 +151,10 @@ def test_grounding_checks_matching_terms():
 
 
 def test_check_lesson_content_reports_the_real_activity():
-    content = LessonContent(
-        written_lesson_markdown="# Lambdas\nWrite `lambda a, b: a - b`.",
+    content = make_lesson_content(
+        markdown="# Lambdas\nWrite `lambda a, b: a - b`.",
         code_practice=None,
-        interactive_activities=[REAL_FREE_CHOICE],
+        activities=[REAL_FREE_CHOICE],
     )
     problems = check_lesson_content(content, language="python")
     assert any("free to choose" in problem for problem in problems)

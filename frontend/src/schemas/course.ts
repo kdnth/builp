@@ -81,13 +81,27 @@ const interactivePracticeSchema = z.object({
   activities: z.array(interactiveActivitySchema).min(1),
 })
 
-const lessonSchema = z.object({
-  id: z.string().min(1),
-  title: z.string().min(1),
-  writtenLesson: writtenLessonSchema,
-  codePractices: z.array(codePracticeSchema),
-  interactivePractices: z.array(interactivePracticeSchema),
-})
+const lessonPageSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('written'), written: writtenLessonSchema }),
+  z.object({ kind: z.literal('code'), practice: codePracticeSchema }),
+  z.object({
+    kind: z.literal('interactive'),
+    practice: interactivePracticeSchema,
+  }),
+])
+
+const lessonSchema = z
+  .object({
+    id: z.string().min(1),
+    title: z.string().min(1),
+    pages: z.array(lessonPageSchema).min(1).optional(),
+    writtenLesson: writtenLessonSchema.optional(),
+    codePractices: z.array(codePracticeSchema).default([]),
+    interactivePractices: z.array(interactivePracticeSchema).default([]),
+  })
+  .refine((lesson) => lesson.pages || lesson.writtenLesson, {
+    message: 'a lesson needs pages, or a writtenLesson',
+  })
 
 const unitSchema = z.object({
   id: z.string().min(1),

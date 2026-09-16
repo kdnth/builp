@@ -174,6 +174,7 @@ def build_graph(
                             outlines,
                             current=(record["unit_index"] + 1, lesson_index + 1),
                         ),
+                        "reading_style": state["reading_style"],
                         "model_config": state["model_config"],
                         "progress": progress,
                         "metrics": state["metrics"],
@@ -193,6 +194,7 @@ def build_graph(
             outline=payload["outline"],
             lesson_index=payload["lesson_index"],
             course_map=payload["course_map"],
+            reading_style=payload["reading_style"],
             model_config=payload["model_config"],
         )
         payload["metrics"].record_stage(stage_metrics("lesson_content", outcome))

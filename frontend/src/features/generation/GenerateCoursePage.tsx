@@ -27,6 +27,7 @@ import {
   type GenerationJob,
   type GenerationMode,
   type LearnerLevel,
+  type ReadingStyle,
 } from '../../lib/api'
 import type { CourseType } from '../../types/course'
 import { useAuthSession } from '../../lib/auth'
@@ -76,6 +77,9 @@ export default function GenerateCoursePage() {
     previous?.level ?? 'beginner',
   )
   const [notes, setNotes] = useState(previous?.notes ?? '')
+  const [readingStyle, setReadingStyle] = useState<ReadingStyle>(
+    previous?.reading_style ?? 'single',
+  )
   const [moreOptionsOpen, setMoreOptionsOpen] = useState(false)
   const [generationMode, setGenerationMode] =
     useState<GenerationMode>('free_credit')
@@ -98,6 +102,7 @@ export default function GenerateCoursePage() {
         learning_goals: learningGoals.trim() || null,
         level,
         notes: notes.trim() || null,
+        reading_style: readingStyle,
       }
 
       let input: CreateGenerationJobInput
@@ -185,6 +190,9 @@ export default function GenerateCoursePage() {
                   setCourseType(nextType)
                   setLanguage(
                     nextType === 'programming' ? 'javascript' : 'auto',
+                  )
+                  setReadingStyle(
+                    nextType === 'programming' ? 'single' : 'interleaved',
                   )
                 }}
                 data={[
@@ -308,6 +316,22 @@ export default function GenerateCoursePage() {
                   value={learningGoals}
                   onChange={(e) => setLearningGoals(e.currentTarget.value)}
                 />
+                <Stack gap={4}>
+                  <Text size="sm" fw={500}>
+                    Reading style
+                  </Text>
+                  <SegmentedControl
+                    value={readingStyle}
+                    onChange={(value) => setReadingStyle(value as ReadingStyle)}
+                    data={[
+                      { label: 'One long read', value: 'single' },
+                      {
+                        label: 'Quick checks while reading',
+                        value: 'interleaved',
+                      },
+                    ]}
+                  />
+                </Stack>
                 <Textarea
                   label="Anything to include or avoid"
                   placeholder="Use UK spelling. Skip the maths derivations."

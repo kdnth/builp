@@ -1,6 +1,6 @@
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 # Field names below match the course JSON contract shared with the frontend
 # (frontend/src/schemas/course.ts) exactly, camelCase included, so the two
@@ -113,14 +113,55 @@ class InteractivePractice(BaseModel):
     activities: list[InteractiveActivity] = Field(min_length=1)
 
 
+class WrittenPage(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    kind: Literal["written"]
+    written: WrittenLesson
+
+
+class CodePage(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    kind: Literal["code"]
+    practice: CodePractice
+
+
+class InteractivePage(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    kind: Literal["interactive"]
+    practice: InteractivePractice
+
+
+LessonPage = Annotated[
+    WrittenPage | CodePage | InteractivePage,
+    Field(discriminator="kind"),
+]
+
+
 class Lesson(BaseModel):
+    """A lesson is an ordered list of pages. Courses written before pages
+    existed carry `writtenLesson` and the two practice lists instead, and
+    `lesson_pages` turns either shape into the same list."""
+
     model_config = ConfigDict(extra="ignore")
 
     id: str = Field(min_length=1)
     title: str = Field(min_length=1)
-    writtenLesson: WrittenLesson
-    codePractices: list[CodePractice]
-    interactivePractices: list[InteractivePractice]
+    pages: list[LessonPage] | None = None
+    writtenLesson: WrittenLesson | None = None
+    codePractices: list[CodePractice] = []
+    interactivePractices: list[InteractivePractice] = []
+
+    @model_validator(mode="after")
+    def _has_content(self) -> "Lesson":
+        if self.pages is not None:
+            if not self.pages:
+                raise ValueError("pages cannot be empty")
+        elif self.writtenLesson is None:
+            raise ValueError("a lesson needs pages, or a writtenLesson")
+        return self
 
 
 class Unit(BaseModel):
@@ -190,3 +231,21 @@ def summarize(
         owner_user_id=owner_user_id,
         saved=saved,
     )
+
+
+def lesson_pages(lesson: Lesson) -> list[LessonPage]:
+    """The pages of a lesson, in order, whichever shape it was written in."""
+    if lesson.pages:
+        return lesson.pages
+
+    pages: list[LessonPage] = []
+    if lesson.writtenLesson is not None:
+        pages.append(WrittenPage(kind="written", written=lesson.writtenLesson))
+    pages += [
+        CodePage(kind="code", practice=practice) for practice in lesson.codePractices
+    ]
+    pages += [
+        InteractivePage(kind="interactive", practice=practice)
+        for practice in lesson.interactivePractices
+    ]
+    return pages

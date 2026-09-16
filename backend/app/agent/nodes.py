@@ -31,7 +31,7 @@ from app.agent.schemas import (
 from app.agent.solver import solve_activities
 from app.agent.stage import StageOutcome, run_stage_with_retries
 from app.schemas.course import CourseType
-from app.schemas.generation import CodePracticeChoice, LearnerLevel
+from app.schemas.generation import CodePracticeChoice, LearnerLevel, ReadingStyle
 
 MAX_ATTEMPTS = 3
 
@@ -163,6 +163,7 @@ def generate_lesson_content(
     outline: UnitOutline,
     lesson_index: int,
     course_map: str,
+    reading_style: ReadingStyle,
     model_config: GenerationModelConfig,
 ) -> StageOutcome[LessonContent]:
     calls: list[CallUsage] = []
@@ -174,6 +175,7 @@ def generate_lesson_content(
             outline=outline,
             lesson_index=lesson_index,
             course_map=course_map,
+            reading_style=reading_style,
             feedback=feedback,
             provider=model_config.provider,
         )

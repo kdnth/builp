@@ -11,11 +11,10 @@ from app.agent.schemas import (
     GeneratedFunctionPractice,
     GeneratedMultipleChoiceActivity,
     GeneratedTestCase,
-    LessonContent,
     UnitOutline,
     UnitSummary,
 )
-from tests.factories import make_lesson_summary, make_overview
+from tests.factories import make_lesson_content, make_lesson_summary, make_overview
 
 
 def _practice(reference_solution: str, cases: list[tuple[list[object], object]]):
@@ -158,12 +157,12 @@ def test_consistency_check_does_not_expose_server_environment(monkeypatch):
 
 
 def test_check_lesson_content_uses_the_requested_language():
-    content = LessonContent(
-        written_lesson_markdown="# hi",
+    content = make_lesson_content(
+        markdown="# hi",
         code_practice=_python_practice(
             "def add(a, b):\n    return a + b", [([1, 2], 3), ([5, 5], 10)]
         ),
-        interactive_activities=[],
+        activities=[],
     )
     assert check_lesson_content(content, language="python") == []
     assert len(check_lesson_content(content, language="javascript")) == 1
@@ -202,12 +201,12 @@ def test_multiple_choice_consistency_catches_out_of_range():
 
 
 def test_check_lesson_content_aggregates_all_problems():
-    content = LessonContent(
-        written_lesson_markdown="# hi",
+    content = make_lesson_content(
+        markdown="# hi",
         code_practice=_practice(
             "function add(a, b) { return a + b }", [([1, 2], 999), ([5, 5], 10)]
         ),
-        interactive_activities=[
+        activities=[
             GeneratedMultipleChoiceActivity(
                 question="2 + 2?", options=["3", "4"], correct_index=5
             ),
@@ -218,10 +217,10 @@ def test_check_lesson_content_aggregates_all_problems():
 
 
 def test_check_lesson_content_empty_when_clean():
-    content = LessonContent(
-        written_lesson_markdown="# hi",
+    content = make_lesson_content(
+        markdown="# hi",
         code_practice=None,
-        interactive_activities=[
+        activities=[
             GeneratedMultipleChoiceActivity(
                 question="2 + 2?", options=["3", "4"], correct_index=1
             ),
@@ -263,12 +262,12 @@ def test_outline_cannot_ask_for_code_when_the_course_has_none():
 
 
 def test_lesson_with_an_unwanted_code_practice_is_rejected():
-    content = LessonContent(
-        written_lesson_markdown="# hi",
+    content = make_lesson_content(
+        markdown="# hi",
         code_practice=_practice(
             "function add(a, b) { return a + b }", [([1, 2], 3), ([5, 5], 10)]
         ),
-        interactive_activities=[],
+        activities=[],
     )
 
     problems = check_lesson_content(content, language="none")

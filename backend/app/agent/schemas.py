@@ -9,7 +9,14 @@ app/agent/assemble.py.
 import json
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, BeforeValidator, Field, JsonValue, WithJsonSchema
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    Field,
+    JsonValue,
+    WithJsonSchema,
+    model_validator,
+)
 
 
 def _parse_json_encoded_value(value: object) -> object:
@@ -29,6 +36,8 @@ def _parse_json_encoded_value(value: object) -> object:
             return value
     return value
 
+
+MAX_LESSON_ACTIVITIES = 6
 
 # LLM schema: a JSON string. Python type: any JSON value.
 JsonEncodedValue = Annotated[
@@ -242,19 +251,48 @@ GeneratedActivity = Annotated[
 ]
 
 
+class GeneratedSection(BaseModel):
+    title: str = Field(description="A short heading for this part of the lesson.")
+    markdown: str = Field(description="This part of the lesson, in markdown.")
+    activities: list[GeneratedActivity] = Field(
+        default_factory=list,
+        max_length=3,
+        description="Checks the learner does right after reading this "
+        "section. They test this section only. Can be empty.",
+    )
+
+
 class LessonContent(BaseModel):
-    written_lesson_markdown: str = Field(
-        description="The full written lesson, in markdown."
+    sections: list[GeneratedSection] = Field(
+        min_length=1,
+        max_length=4,
+        description="The lesson, split into the parts a learner reads in order.",
     )
     code_practice: GeneratedFunctionPractice | None = Field(
         default=None,
         description="A runnable code exercise for this lesson, if the "
         "lesson calls for one.",
     )
-    interactive_activities: list[GeneratedActivity] = Field(
-        description="1 to 3 interactive check-for-understanding activities.",
-        max_length=3,
-    )
+
+    @property
+    def written_lesson_markdown(self) -> str:
+        """The whole lesson text, for checks that read the written words."""
+        return "\n\n".join(section.markdown for section in self.sections)
+
+    @property
+    def interactive_activities(self) -> list[GeneratedActivity]:
+        """Every activity in the lesson, in reading order."""
+        return [
+            activity for section in self.sections for activity in section.activities
+        ]
+
+    @model_validator(mode="after")
+    def _activity_budget(self) -> "LessonContent":
+        if len(self.interactive_activities) > MAX_LESSON_ACTIVITIES:
+            raise ValueError(
+                f"a lesson can have at most {MAX_LESSON_ACTIVITIES} activities"
+            )
+        return self
 
 
 # --- Evaluation (shared shape across all three stages) ------------------

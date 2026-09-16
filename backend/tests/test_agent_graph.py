@@ -3,12 +3,16 @@ from app.agent.schemas import (
     GeneratedFunctionPractice,
     GeneratedMultipleChoiceActivity,
     GeneratedTestCase,
-    LessonContent,
     UnitOutline,
     UnitSummary,
 )
 from app.agent.stage import StageOutcome
-from tests.factories import make_brief, make_lesson_summary, make_overview
+from tests.factories import (
+    make_brief,
+    make_lesson_content,
+    make_lesson_summary,
+    make_overview,
+)
 
 
 def _passing_overview(*, topic, audience, num_units, **kwargs):
@@ -37,10 +41,10 @@ def _passing_unit_outline(*, overview, unit, lessons_per_unit, **kwargs):
 
 
 def _passing_lesson_content(*, overview, unit, outline, lesson_index, **kwargs):
-    content = LessonContent(
-        written_lesson_markdown=f"# {outline.lessons[lesson_index].title}",
+    content = make_lesson_content(
+        markdown=f"# {outline.lessons[lesson_index].title}",
         code_practice=None,
-        interactive_activities=[
+        activities=[
             GeneratedMultipleChoiceActivity(
                 question="Is this a test?", options=["Yes", "No"], correct_index=0
             )
@@ -199,8 +203,8 @@ def test_code_practice_language_comes_from_the_brief():
         )
 
     def lesson_with_code(**kwargs):
-        content = LessonContent(
-            written_lesson_markdown="# Adding",
+        content = make_lesson_content(
+            markdown="# Adding",
             code_practice=GeneratedFunctionPractice(
                 title="Add",
                 function_signature="add(a, b)",
@@ -211,7 +215,7 @@ def test_code_practice_language_comes_from_the_brief():
                     GeneratedTestCase(input=[5, 5], expected_output=10),
                 ],
             ),
-            interactive_activities=[],
+            activities=[],
         )
         return StageOutcome(content=content, passed=True, attempts=[])
 
@@ -229,5 +233,6 @@ def test_code_practice_language_comes_from_the_brief():
         ),
     )
 
-    practice = course.units[0].lessons[0].codePractices[0]
-    assert practice.language == "python"
+    pages = course.units[0].lessons[0].pages
+    code = next(page for page in pages if page.kind == "code")
+    assert code.practice.language == "python"

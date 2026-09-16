@@ -22,7 +22,7 @@ from app.agent.schemas import (
     UnitSummary,
 )
 from app.schemas.course import CodeLanguage, CourseType
-from app.schemas.generation import CodePracticeChoice, LearnerLevel
+from app.schemas.generation import CodePracticeChoice, LearnerLevel, ReadingStyle
 
 LANGUAGE_NAMES: dict[str, str] = {
     "javascript": "JavaScript",
@@ -46,6 +46,16 @@ PROFILE_GUIDANCE: dict[LessonProfile, str] = {
     "register where they matter.",
     "programming": "This is a programming lesson. Show short runnable "
     "examples and explain what each line does.",
+}
+
+READING_STYLE_PLAN: dict[ReadingStyle, str] = {
+    "single": "Write the lesson as one section that holds the whole "
+    "explanation, and put every activity in that one section. The learner "
+    "reads it all, then practices.",
+    "interleaved": "Split the lesson into 2 to 4 sections, each with its own "
+    "short heading. After a section that introduces something worth "
+    "checking, add 1 or 2 activities that test that section only, not the "
+    "whole lesson. The last section ends the lesson.",
 }
 
 PROFILE_REVIEW_CRITERIA: dict[LessonProfile, str] = {
@@ -340,9 +350,11 @@ the same order as in expected_output.""",
 }
 
 _LESSON_CONTENT_SYSTEM_TEMPLATE = """You write the full content for one \
-lesson: a written explanation in markdown, an optional runnable code \
-practice, and 1-3 interactive activities that check understanding of the \
+lesson: the written explanation in markdown sections, an optional runnable \
+code practice, and interactive activities that check understanding of the \
 lesson's goal. Write code examples in {language}.
+
+{reading_plan}
 
 {profile_guidance}
 
@@ -390,7 +402,10 @@ generic trivia."""
 
 
 def lesson_content_system(
-    *, profile: LessonProfile, code_language: CodePracticePolicy
+    *,
+    profile: LessonProfile,
+    code_language: CodePracticePolicy,
+    reading_style: ReadingStyle,
 ) -> str:
     """The shared core prompt plus the modules this lesson needs."""
     if code_language == "none":
@@ -405,6 +420,7 @@ def lesson_content_system(
         language=example_language,
         code_practice_rules=code_practice_rules,
         profile_guidance=PROFILE_GUIDANCE[profile],
+        reading_plan=READING_STYLE_PLAN[reading_style],
     )
 
 
@@ -415,6 +431,7 @@ def lesson_content_generate_prompt(
     outline: UnitOutline,
     lesson_index: int,
     course_map: str,
+    reading_style: ReadingStyle,
     feedback: str | None,
     provider: SupportedProvider,
 ) -> list[BaseMessage]:
@@ -422,8 +439,13 @@ def lesson_content_generate_prompt(
     code_language: CodePracticePolicy = (
         overview.brief.code_practice_policy if lesson.include_code_practice else "none"
     )
+    system_prompt = lesson_content_system(
+        profile=lesson.profile,
+        code_language=code_language,
+        reading_style=reading_style,
+    )
     context = (
-        f"{lesson_content_system(profile=lesson.profile, code_language=code_language)}"
+        f"{system_prompt}"
         f"\n\nCourse audience: {overview.audience}\n\n"
         f"{render_brief(overview.brief)}\n\n{course_map}"
     )

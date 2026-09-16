@@ -129,7 +129,12 @@ def create_generation_job(
         audience=payload.audience,
         num_units=payload.num_units,
         lessons_per_unit=payload.lessons_per_unit,
+        course_type=payload.course_type,
         language=payload.language,
+        learning_goals=payload.learning_goals,
+        level=payload.level,
+        notes=payload.notes,
+        reading_style=payload.reading_style,
     )
     db.add(job)
     db.commit()

@@ -350,6 +350,7 @@ interface SharedCreateGenerationJobInput {
   learning_goals?: string | null
   level: LearnerLevel
   notes?: string | null
+  reading_style: ReadingStyle
 }
 
 export type GenerationMode = 'free_credit' | 'provider_api_key'

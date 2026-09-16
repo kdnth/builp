@@ -10,6 +10,7 @@ from app.agent.schemas import (
     SolvedActivity,
 )
 from app.agent.solver import render_activities, solve_activities
+from tests.factories import make_lesson_content
 
 MODEL_CONFIG = GenerationModelConfig(provider="anthropic")
 
@@ -42,10 +43,9 @@ class FakeModel:
 
 
 def _run(solutions, activities):
-    content = LessonContent(
-        written_lesson_markdown="# Lambdas\nA lambda returns its expression.",
-        code_practice=None,
-        interactive_activities=activities,
+    content = make_lesson_content(
+        markdown="# Lambdas\nA lambda returns its expression.",
+        activities=activities,
     )
     model = FakeModel(ActivitySolutions(activities=solutions))
     calls: list[CallUsage] = []
@@ -157,11 +157,7 @@ def test_an_alternative_that_repeats_the_key_is_ignored():
 
 
 def test_a_lesson_without_solvable_activities_makes_no_call():
-    content = LessonContent(
-        written_lesson_markdown="# Lambdas",
-        code_practice=None,
-        interactive_activities=[],
-    )
+    content = make_lesson_content(markdown="# Lambdas")
     model = FakeModel(ActivitySolutions(activities=[]))
     calls: list[CallUsage] = []
     with patch("app.agent.llm.get_model", return_value=model):
@@ -176,12 +172,14 @@ def test_a_lesson_without_solvable_activities_makes_no_call():
 
 def test_lesson_evaluation_skips_the_judge_when_the_solver_objects():
     from app.agent import nodes
-    from tests.factories import make_outline, make_overview
+    from tests.factories import make_lesson_content, make_outline, make_overview
 
     overview = make_overview()
     outline = make_outline(activity_types=["multipleChoice"])
-    content = LessonContent(
-        written_lesson_markdown="# L", code_practice=None, interactive_activities=[]
+    content = make_lesson_content(
+        markdown="# L",
+        code_practice=None,
+        activities=[],
     )
     judge_calls = []
 
@@ -201,6 +199,7 @@ def test_lesson_evaluation_skips_the_judge_when_the_solver_objects():
             outline=outline,
             lesson_index=0,
             course_map="Course map:",
+            reading_style="single",
             model_config=MODEL_CONFIG,
         )
 
