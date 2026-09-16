@@ -13,7 +13,7 @@ from app.agent.metrics import (
     summarize_job_metrics,
 )
 from app.agent.run import run_generation_job
-from app.agent.schemas import EvaluationResult
+from app.agent.schemas import EvaluationResult, ScreeningDecision
 from app.agent.stage import StageAttempt, StageOutcome, run_stage_with_retries
 from app.models import GenerationJob, GenerationStageMetric
 from tests.test_agent_graph import (
@@ -21,6 +21,8 @@ from tests.test_agent_graph import (
     _passing_overview,
     _passing_unit_outline,
 )
+
+ALLOWED = ScreeningDecision(allowed=True)
 
 
 class RecordingMetrics:
@@ -293,6 +295,7 @@ def test_run_generation_job_stores_a_metrics_summary(db_session):
     with (
         patch("app.agent.run.SessionLocal", factory),
         patch("app.agent.run.run_generation", fake_run_generation),
+        patch("app.agent.run.screen_topic", return_value=ALLOWED),
     ):
         run_generation_job("job-1")
 

@@ -12,13 +12,58 @@ overhead.
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 
 from app.agent.llm import SupportedProvider, cached_system_message
-from app.agent.schemas import CourseOverview, LessonContent, UnitOutline, UnitSummary
-from app.schemas.course import CodeLanguage
+from app.agent.schemas import (
+    CodePracticePolicy,
+    CourseBrief,
+    CourseOverview,
+    LessonContent,
+    LessonProfile,
+    UnitOutline,
+    UnitSummary,
+)
+from app.schemas.course import CodeLanguage, CourseType
+from app.schemas.generation import CodePracticeChoice, LearnerLevel
 
-LANGUAGE_NAMES: dict[CodeLanguage, str] = {
+LANGUAGE_NAMES: dict[str, str] = {
     "javascript": "JavaScript",
     "python": "Python",
 }
+
+PROFILE_GUIDANCE: dict[LessonProfile, str] = {
+    "conceptual": "This is a concept lesson. Define each term precisely, "
+    "contrast it with the idea it is most often confused with, and give one "
+    "example and one non-example.",
+    "procedural": "This is a procedure lesson. Give the steps in order, say "
+    "when each step applies, and call out the step learners skip most often.",
+    "quantitative": "This is a quantitative lesson. State each formula "
+    "plainly, then work one full example step by step with units on every "
+    "line. Keep the numbers small enough to check by hand.",
+    "narrative": "This is a narrative lesson. Give dates, the people or "
+    "groups involved, and cause and effect. Where historians disagree, say "
+    "that it is contested instead of picking one side.",
+    "language": "This is a language lesson. Show the target language with "
+    "its translation, keep sentences short, and mark gender, accents, and "
+    "register where they matter.",
+    "programming": "This is a programming lesson. Show short runnable "
+    "examples and explain what each line does.",
+}
+
+PROFILE_REVIEW_CRITERIA: dict[LessonProfile, str] = {
+    "conceptual": "definitions are precise, and the contrast with nearby "
+    "ideas is correct",
+    "procedural": "the steps are in the right order, complete, and safe to follow",
+    "quantitative": "every worked example is correct step by step, and units "
+    "are consistent",
+    "narrative": "dates, names, and cause and effect are correct, and "
+    "contested views are named as contested",
+    "language": "the target language is correct, and it matches the dialect "
+    "and register the course states",
+    "programming": "code examples run as described",
+}
+
+
+def _course_type_label(course_type: CourseType) -> str:
+    return "programming" if course_type == "programming" else "general subject"
 
 
 def _feedback_block(feedback: str | None) -> str:
@@ -44,6 +89,56 @@ def render_overview(overview: CourseOverview) -> str:
     return "\n".join(lines)
 
 
+def render_brief(brief: CourseBrief) -> str:
+    lines = [
+        f"Domain: {brief.domain}",
+        "Objectives:",
+        *[f"- {objective}" for objective in brief.learning_objectives],
+    ]
+    if brief.prerequisites:
+        lines += ["Assumed knowledge:", *[f"- {item}" for item in brief.prerequisites]]
+    if brief.glossary:
+        lines += [
+            "Glossary, use these words with these meanings:",
+            *[f"- {term.term}: {term.definition}" for term in brief.glossary],
+        ]
+    if brief.misconceptions:
+        lines += [
+            "Common misconceptions, good material for wrong options:",
+            *[f"- {item}" for item in brief.misconceptions],
+        ]
+    if brief.conventions:
+        lines.append(f"Conventions: {brief.conventions}")
+    if brief.sensitivity != "none":
+        lines.append(
+            f"This subject touches {brief.sensitivity} decisions. Teach the "
+            "general subject. Never give advice for one person's own case."
+        )
+    return "\n".join(lines)
+
+
+def render_course_map(
+    overview: CourseOverview,
+    outlines: list[tuple[UnitSummary, UnitOutline]],
+    *,
+    current: tuple[int, int] | None = None,
+) -> str:
+    """Every unit with its lessons, so a lesson knows what the others teach."""
+    lines = ["Course map:"]
+    for unit_index, (unit, outline) in enumerate(outlines, start=1):
+        lines.append(f"Unit {unit_index}: {unit.title} - {unit.goal}")
+        for lesson_index, lesson in enumerate(outline.lessons, start=1):
+            marker = (
+                "  <- you are writing this lesson"
+                if current == (unit_index, lesson_index)
+                else ""
+            )
+            lines.append(
+                f"  {unit_index}.{lesson_index} {lesson.title} - {lesson.goal}{marker}"
+            )
+    return "\n".join(lines)
+
+
 def render_unit_outline(unit: UnitSummary, outline: UnitOutline) -> str:
     lines = [f"## {unit.title}", unit.goal, "", "Lessons:"]
     for index, lesson in enumerate(outline.lessons, start=1):
@@ -58,11 +153,40 @@ def render_unit_outline(unit: UnitSummary, outline: UnitOutline) -> str:
 
 # --- Stage 1: course overview --------------------------------------------
 
-OVERVIEW_SYSTEM = """You design programming course curricula. Given a topic \
-and audience, you produce a course overview: a title, a short learner-\
-facing description, an audience statement, and an ordered list of units \
-that build on each other logically. Do not write lesson-level detail yet, \
-only unit-level scope."""
+OVERVIEW_SYSTEM = """You design course curricula for any teachable \
+subject. Given a topic and audience, you produce a course overview: a \
+title, a short learner-facing description, an audience statement, an \
+ordered list of units that build on each other logically, and a brief that \
+every later writing step will follow. Do not write lesson-level detail \
+yet, only unit-level scope.
+
+The brief matters as much as the units. Lessons are written in parallel by \
+writers who see the brief but not each other's work, so the brief is what \
+keeps their terms, depth, and conventions the same. Write objectives the \
+learner can be observed doing, a glossary of the words this course uses, \
+and the wrong beliefs learners actually hold about this topic."""
+
+
+def _code_practice_instruction(
+    course_type: CourseType, language: CodePracticeChoice
+) -> str:
+    if language in ("javascript", "python"):
+        return (
+            "Code practice: set code_practice_policy to "
+            f"'{language}'. Lessons may include runnable {LANGUAGE_NAMES[language]} "
+            "exercises."
+        )
+    if language == "none":
+        return (
+            "Code practice: set code_practice_policy to 'none'. This course "
+            "has no runnable code."
+        )
+    return (
+        "Code practice: you decide. Set code_practice_policy to 'python' or "
+        "'javascript' only when writing code would genuinely help learners of "
+        "this subject, for example statistics or data work. Otherwise set it "
+        "to 'none'."
+    )
 
 
 def overview_generate_prompt(
@@ -70,21 +194,32 @@ def overview_generate_prompt(
     topic: str,
     audience: str,
     num_units: int,
-    language: CodeLanguage,
+    course_type: CourseType,
+    language: CodePracticeChoice,
+    level: LearnerLevel,
+    learning_goals: str | None,
+    notes: str | None,
     feedback: str | None,
 ) -> list[BaseMessage]:
-    human = (
-        f"Topic: {topic}\n"
-        f"Audience: {audience}\n"
-        f"Programming language: {LANGUAGE_NAMES[language]}\n"
-        f"Number of units: exactly {num_units}. Not fewer, not more.\n"
-        "Produce the course overview." + _feedback_block(feedback)
-    )
+    lines = [
+        f"Topic: {topic}",
+        f"Audience: {audience}",
+        f"Level: {level}",
+        f"Course type: {_course_type_label(course_type)}",
+        _code_practice_instruction(course_type, language),
+    ]
+    if learning_goals:
+        lines.append(f"What the learner wants to be able to do: {learning_goals}")
+    if notes:
+        lines.append(f"Requests from the learner, follow them: {notes}")
+    lines.append(f"Number of units: exactly {num_units}. Not fewer, not more.")
+    lines.append("Produce the course overview and the brief.")
+    human = "\n".join(lines) + _feedback_block(feedback)
     return [SystemMessage(content=OVERVIEW_SYSTEM), HumanMessage(content=human)]
 
 
 OVERVIEW_EVAL_SYSTEM = """You are a strict curriculum reviewer. You judge a \
-generated course overview against three criteria:
+generated course overview against five criteria:
 
 1. Topic coverage: do the units, together, actually cover the stated topic \
    at a reasonable depth for the stated audience?
@@ -92,6 +227,10 @@ generated course overview against three criteria:
    narrow, and not overlapping with another unit?
 3. Logical progression: does each unit build on knowledge from the units \
    before it, in a sensible order?
+4. Objectives: is each learning objective something the learner can be \
+   observed doing, rather than "understand X"?
+5. Brief quality: is the glossary correct and free of invented terms, and \
+   are the misconceptions ones learners really hold?
 
 Score 1-5. Pass only if the overview is genuinely usable as-is; a 3 should \
 still fail. Be specific in feedback: name the unit and the exact problem."""
@@ -107,11 +246,12 @@ def overview_evaluate_prompt(overview: CourseOverview) -> list[BaseMessage]:
 # --- Stage 2: unit outline (one call per unit) ---------------------------
 
 UNIT_OUTLINE_SYSTEM = """You write the lesson-level outline for one unit of \
-a course. You are given the full course overview for context. Produce an \
-ordered list of lessons for just this one unit. Each lesson needs a title, \
-a one-sentence goal (what the learner can do afterward), whether it should \
-include a runnable code practice, and which interactive activity types (if \
-any) fit it. Not every lesson needs every activity type; use judgment."""
+a course. You are given the course overview and its brief for context. \
+Produce an ordered list of lessons for just this one unit. Each lesson \
+needs a title, a one-sentence goal (what the learner can do afterward), a \
+profile from the brief's lesson_profiles, whether it should include a \
+runnable code practice, and which interactive activity types (if any) fit \
+it. Not every lesson needs every activity type; use judgment."""
 
 
 def unit_outline_generate_prompt(
@@ -119,17 +259,26 @@ def unit_outline_generate_prompt(
     overview: CourseOverview,
     unit: UnitSummary,
     lessons_per_unit: int,
-    language: CodeLanguage,
     feedback: str | None,
     provider: SupportedProvider,
 ) -> list[BaseMessage]:
     system = cached_system_message(
-        f"{UNIT_OUTLINE_SYSTEM}\n\n{render_overview(overview)}",
+        f"{UNIT_OUTLINE_SYSTEM}\n\n{render_overview(overview)}\n\n"
+        f"{render_brief(overview.brief)}",
         provider=provider,
+    )
+    policy = overview.brief.code_practice_policy
+    code_line = (
+        "This course has no code practice, so include_code_practice is always false."
+        if policy == "none"
+        else f"Code practices use {LANGUAGE_NAMES[policy]}. Use them only for "
+        "lessons where writing code is the best way to practice."
     )
     human = (
         f'Write the outline for this unit: "{unit.title}" - {unit.goal}\n'
-        f"Programming language: {LANGUAGE_NAMES[language]}\n"
+        f"{code_line}\n"
+        "Every lesson's profile must be one of: "
+        f"{', '.join(overview.brief.lesson_profiles)}.\n"
         f"Exactly {lessons_per_unit} lessons. Not fewer, not more."
         + _feedback_block(feedback)
     )
@@ -193,7 +342,9 @@ the same order as in expected_output.""",
 _LESSON_CONTENT_SYSTEM_TEMPLATE = """You write the full content for one \
 lesson: a written explanation in markdown, an optional runnable code \
 practice, and 1-3 interactive activities that check understanding of the \
-lesson's goal. Write every code example in {language}.
+lesson's goal. Write code examples in {language}.
+
+{profile_guidance}
 
 {code_practice_rules}
 
@@ -238,10 +389,22 @@ Every activity should actually test the lesson's specific goal, not \
 generic trivia."""
 
 
-def lesson_content_system(language: CodeLanguage) -> str:
+def lesson_content_system(
+    *, profile: LessonProfile, code_language: CodePracticePolicy
+) -> str:
+    """The shared core prompt plus the modules this lesson needs."""
+    if code_language == "none":
+        code_practice_rules = (
+            "This lesson has no code practice. Do not write code_practice."
+        )
+        example_language = "the language the lesson is about, when it shows code"
+    else:
+        code_practice_rules = _CODE_PRACTICE_RULES[code_language]
+        example_language = LANGUAGE_NAMES[code_language]
     return _LESSON_CONTENT_SYSTEM_TEMPLATE.format(
-        language=LANGUAGE_NAMES[language],
-        code_practice_rules=_CODE_PRACTICE_RULES[language],
+        language=example_language,
+        code_practice_rules=code_practice_rules,
+        profile_guidance=PROFILE_GUIDANCE[profile],
     )
 
 
@@ -251,15 +414,18 @@ def lesson_content_generate_prompt(
     unit: UnitSummary,
     outline: UnitOutline,
     lesson_index: int,
-    language: CodeLanguage,
+    course_map: str,
     feedback: str | None,
     provider: SupportedProvider,
 ) -> list[BaseMessage]:
     lesson = outline.lessons[lesson_index]
+    code_language: CodePracticePolicy = (
+        overview.brief.code_practice_policy if lesson.include_code_practice else "none"
+    )
     context = (
-        f"{lesson_content_system(language)}\n\n"
-        f"Course audience: {overview.audience}\n\n"
-        f"{render_unit_outline(unit, outline)}"
+        f"{lesson_content_system(profile=lesson.profile, code_language=code_language)}"
+        f"\n\nCourse audience: {overview.audience}\n\n"
+        f"{render_brief(overview.brief)}\n\n{course_map}"
     )
     system = cached_system_message(context, provider=provider)
 
@@ -305,15 +471,23 @@ def lesson_content_evaluate_prompt(
     unit: UnitSummary,
     outline: UnitOutline,
     lesson_index: int,
-    language: CodeLanguage,
     content: LessonContent,
     provider: SupportedProvider,
 ) -> list[BaseMessage]:
     lesson = outline.lessons[lesson_index]
+    policy = overview.brief.code_practice_policy
+    code_line = (
+        "This course has no code practice.\n"
+        if policy == "none"
+        else f"Code practices are written in {LANGUAGE_NAMES[policy]}.\n"
+    )
+    profile_criteria = PROFILE_REVIEW_CRITERIA[lesson.profile]
     context = (
-        f"{LESSON_CONTENT_EVAL_SYSTEM}\n\n"
-        f"Course programming language: {LANGUAGE_NAMES[language]}\n"
+        f"{LESSON_CONTENT_EVAL_SYSTEM}\n"
+        f"For this lesson, also check that {profile_criteria}.\n\n"
+        f"{code_line}"
         f"Course audience: {overview.audience}\n\n"
+        f"{render_brief(overview.brief)}\n\n"
         f"{render_unit_outline(unit, outline)}"
     )
     system = cached_system_message(context, provider=provider)
@@ -348,3 +522,50 @@ def solver_prompt(
 ) -> list[BaseMessage]:
     human = f"Lesson:\n\n{written_lesson_markdown}\n\nActivities:\n\n{activities_text}"
     return [SystemMessage(content=SOLVER_SYSTEM), HumanMessage(content=human)]
+
+
+# --- Screening (one fast call before any other work) ----------------------
+
+SCREENING_SYSTEM = """You decide whether a learning platform can generate a \
+course on a requested topic. Studying a subject is not the same as doing \
+harm with it, so judge the request, not the subject area.
+
+Allow:
+- Academic, historical, and scientific study of any subject, including hard \
+  ones such as warfare, drugs and their pharmacology, extremism as a \
+  subject of study, or the law.
+- General professional subjects taught as knowledge: medicine, law, \
+  personal finance, nutrition, safety.
+- Security topics taught for defense, including how attacks work.
+
+Refuse:
+- operational_harm: instructions whose main use is causing harm, such as \
+  building weapons or explosives, synthesizing illegal drugs, writing \
+  malware, or breaking into systems that are not the learner's.
+- individual_medical_advice, individual_legal_advice, \
+  individual_financial_advice: the request asks for advice on one person's \
+  own case ("what dose should I take", "how do I win my case", "which \
+  stocks should I buy") rather than teaching the subject.
+- sexual_content: sexual or erotic material.
+- hate_or_harassment: content that attacks or demeans a group or a person.
+
+When you refuse, write one clear sentence for the learner. Say what cannot \
+be generated and, when a close topic is fine, say so. Do not lecture."""
+
+
+def screening_prompt(
+    *,
+    topic: str,
+    audience: str,
+    learning_goals: str | None,
+    notes: str | None,
+) -> list[BaseMessage]:
+    lines = [f"Topic: {topic}", f"Audience: {audience}"]
+    if learning_goals:
+        lines.append(f"Learning goals: {learning_goals}")
+    if notes:
+        lines.append(f"Notes: {notes}")
+    return [
+        SystemMessage(content=SCREENING_SYSTEM),
+        HumanMessage(content="\n".join(lines)),
+    ]

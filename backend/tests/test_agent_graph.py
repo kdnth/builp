@@ -1,21 +1,19 @@
 from app.agent.graph import build_graph, run_generation
 from app.agent.schemas import (
-    CourseOverview,
     GeneratedFunctionPractice,
     GeneratedMultipleChoiceActivity,
     GeneratedTestCase,
     LessonContent,
-    LessonSummary,
     UnitOutline,
     UnitSummary,
 )
 from app.agent.stage import StageOutcome
+from tests.factories import make_brief, make_lesson_summary, make_overview
 
 
-def _passing_overview(*, topic, audience, num_units, language, model_config):
-    overview = CourseOverview(
+def _passing_overview(*, topic, audience, num_units, **kwargs):
+    overview = make_overview(
         title=f"Learn {topic}",
-        description="A course.",
         audience=audience,
         units=[
             UnitSummary(title=f"Unit {i + 1}", goal=f"Cover part {i + 1}.")
@@ -25,14 +23,12 @@ def _passing_overview(*, topic, audience, num_units, language, model_config):
     return StageOutcome(content=overview, passed=True, attempts=[])
 
 
-def _passing_unit_outline(*, overview, unit, lessons_per_unit, language, model_config):
+def _passing_unit_outline(*, overview, unit, lessons_per_unit, **kwargs):
     outline = UnitOutline(
         lessons=[
-            LessonSummary(
+            make_lesson_summary(
                 title=f"{unit.title} Lesson {i + 1}",
-                goal="Learn a thing.",
-                include_code_practice=False,
-                interactive_activity_types=["multipleChoice"],
+                activity_types=["multipleChoice"],
             )
             for i in range(lessons_per_unit)
         ]
@@ -40,9 +36,7 @@ def _passing_unit_outline(*, overview, unit, lessons_per_unit, language, model_c
     return StageOutcome(content=outline, passed=True, attempts=[])
 
 
-def _passing_lesson_content(
-    *, overview, unit, outline, lesson_index, language, model_config
-):
+def _passing_lesson_content(*, overview, unit, outline, lesson_index, **kwargs):
     content = LessonContent(
         written_lesson_markdown=f"# {outline.lessons[lesson_index].title}",
         code_practice=None,
@@ -55,19 +49,23 @@ def _passing_lesson_content(
     return StageOutcome(content=content, passed=True, attempts=[])
 
 
-def test_graph_produces_a_fully_assembled_course():
-    graph = build_graph(
-        overview_fn=_passing_overview,
-        unit_outline_fn=_passing_unit_outline,
-        lesson_content_fn=_passing_lesson_content,
-    )
+def _graph(**overrides):
+    functions = {
+        "overview_fn": _passing_overview,
+        "unit_outline_fn": _passing_unit_outline,
+        "lesson_content_fn": _passing_lesson_content,
+    }
+    functions.update(overrides)
+    return build_graph(**functions)
 
+
+def test_graph_produces_a_fully_assembled_course():
     course = run_generation(
         topic="testing",
         audience="beginners",
         num_units=3,
         lessons_per_unit=2,
-        graph=graph,
+        graph=_graph(),
     )
 
     assert course.title == "Learn testing"
@@ -91,72 +89,116 @@ def test_graph_produces_a_fully_assembled_course():
 def test_graph_result_validates_against_the_real_course_schema():
     from app.schemas.course import Course
 
-    graph = build_graph(
-        overview_fn=_passing_overview,
-        unit_outline_fn=_passing_unit_outline,
-        lesson_content_fn=_passing_lesson_content,
-    )
     course = run_generation(
         topic="testing",
         audience="beginners",
         num_units=2,
         lessons_per_unit=1,
-        graph=graph,
+        graph=_graph(),
     )
     Course.model_validate(course.model_dump())
 
 
 def test_graph_handles_uneven_lesson_counts_per_unit():
-    def variable_unit_outline(
-        *, overview, unit, lessons_per_unit, language, model_config
-    ):
+    def variable_unit_outline(*, overview, unit, lessons_per_unit, **kwargs):
         # unit N gets N lessons, not a fixed count
         count = int(unit.title.split()[-1])
         outline = UnitOutline(
             lessons=[
-                LessonSummary(
-                    title=f"{unit.title} Lesson {i + 1}",
-                    goal="x",
-                    include_code_practice=False,
-                    interactive_activity_types=[],
-                )
+                make_lesson_summary(title=f"{unit.title} Lesson {i + 1}")
                 for i in range(count)
             ]
         )
         return StageOutcome(content=outline, passed=True, attempts=[])
 
-    graph = build_graph(
-        overview_fn=_passing_overview,
-        unit_outline_fn=variable_unit_outline,
-        lesson_content_fn=_passing_lesson_content,
-    )
     course = run_generation(
         topic="testing",
         audience="beginners",
         num_units=3,
         lessons_per_unit=1,
-        graph=graph,
+        graph=_graph(unit_outline_fn=variable_unit_outline),
     )
 
     assert [len(unit.lessons) for unit in course.units] == [1, 2, 3]
 
 
-def test_graph_passes_language_to_every_stage_and_the_assembled_course():
-    seen: list[tuple[str, str]] = []
+def test_every_lesson_sees_the_whole_course_map():
+    maps: list[str] = []
 
-    def overview_fn(**kwargs):
-        seen.append(("overview", kwargs["language"]))
-        return _passing_overview(**kwargs)
+    def recording_lesson(*, course_map, **kwargs):
+        maps.append(course_map)
+        return _passing_lesson_content(course_map=course_map, **kwargs)
 
-    def unit_outline_fn(**kwargs):
-        seen.append(("unit", kwargs["language"]))
-        outline = _passing_unit_outline(**kwargs).content
-        for lesson in outline.lessons:
-            lesson.include_code_practice = True
-        return StageOutcome(content=outline, passed=True, attempts=[])
+    run_generation(
+        topic="testing",
+        audience="beginners",
+        num_units=2,
+        lessons_per_unit=2,
+        graph=_graph(lesson_content_fn=recording_lesson),
+    )
 
-    def lesson_content_fn(**kwargs):
-        seen.append(("lesson", kwargs["language"]))
+    assert len(maps) == 4
+    for course_map in maps:
+        # the other unit's lessons are in the map, not only this lesson's
+        assert "Unit 1: Unit 1" in course_map
+        assert "Unit 2: Unit 2" in course_map
+        assert course_map.count("Lesson") >= 4
+        assert course_map.count("you are writing this lesson") == 1
+    assert len(set(maps)) == 4
+
+
+def test_lesson_generation_can_be_routed_by_profile():
+    routed: list[str] = []
+
+    def narrative_outline(*, overview, unit, lessons_per_unit, **kwargs):
+        return StageOutcome(
+            content=UnitOutline(
+                lessons=[make_lesson_summary(profile="narrative", title="Story")]
+            ),
+            passed=True,
+            attempts=[],
+        )
+
+    def narrative_lesson(**kwargs):
+        routed.append("narrative")
+        return _passing_lesson_content(**kwargs)
+
+    def shared_lesson(**kwargs):
+        routed.append("shared")
+        return _passing_lesson_content(**kwargs)
+
+    run_generation(
+        topic="history",
+        audience="beginners",
+        num_units=1,
+        lessons_per_unit=1,
+        graph=build_graph(
+            overview_fn=_passing_overview,
+            unit_outline_fn=narrative_outline,
+            lesson_content_fn=shared_lesson,
+            lesson_content_fns={"narrative": narrative_lesson},
+        ),
+    )
+
+    assert routed == ["narrative"]
+
+
+def test_code_practice_language_comes_from_the_brief():
+    def python_overview(**kwargs):
+        overview = _passing_overview(**kwargs).content
+        overview.brief = make_brief(code_practice_policy="python")
+        return StageOutcome(content=overview, passed=True, attempts=[])
+
+    def outline_with_code(*, overview, unit, lessons_per_unit, **kwargs):
+        return StageOutcome(
+            content=UnitOutline(
+                lessons=[make_lesson_summary(include_code_practice=True)]
+            ),
+            passed=True,
+            attempts=[],
+        )
+
+    def lesson_with_code(**kwargs):
         content = LessonContent(
             written_lesson_markdown="# Adding",
             code_practice=GeneratedFunctionPractice(
@@ -173,27 +215,19 @@ def test_graph_passes_language_to_every_stage_and_the_assembled_course():
         )
         return StageOutcome(content=content, passed=True, attempts=[])
 
-    graph = build_graph(
-        overview_fn=overview_fn,
-        unit_outline_fn=unit_outline_fn,
-        lesson_content_fn=lesson_content_fn,
-    )
     course = run_generation(
-        topic="testing",
+        topic="stats",
         audience="beginners",
-        num_units=2,
-        lessons_per_unit=2,
-        language="python",
-        graph=graph,
+        num_units=1,
+        lessons_per_unit=1,
+        course_type="general",
+        language="auto",
+        graph=build_graph(
+            overview_fn=python_overview,
+            unit_outline_fn=outline_with_code,
+            lesson_content_fn=lesson_with_code,
+        ),
     )
 
-    assert {language for _, language in seen} == {"python"}
-    assert [stage for stage, _ in seen].count("lesson") == 4
-    practices = [
-        practice
-        for unit in course.units
-        for lesson in unit.lessons
-        for practice in lesson.codePractices
-    ]
-    assert len(practices) == 4
-    assert {practice.language for practice in practices} == {"python"}
+    practice = course.units[0].lessons[0].codePractices[0]
+    assert practice.language == "python"

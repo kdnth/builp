@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { listCourses, type CourseSummary } from '../lib/api'
+import type { CourseType } from '../types/course'
 
 export function useCourses(params?: {
   q?: string
   tag?: string
+  courseType?: CourseType
   ownerUserId?: string
   forUserId?: string
   limit?: number
@@ -11,6 +13,7 @@ export function useCourses(params?: {
 }) {
   const q = params?.q
   const tag = params?.tag
+  const courseType = params?.courseType
   const ownerUserId = params?.ownerUserId
   const forUserId = params?.forUserId
   const limit = params?.limit
@@ -31,6 +34,7 @@ export function useCourses(params?: {
       const result = await listCourses({
         q,
         tag,
+        courseType,
         ownerUserId,
         forUserId,
         limit,
@@ -45,7 +49,7 @@ export function useCourses(params?: {
     } finally {
       if (requestId.current === thisRequest) setLoading(false)
     }
-  }, [q, tag, ownerUserId, forUserId, limit, offset])
+  }, [q, tag, courseType, ownerUserId, forUserId, limit, offset])
 
   useEffect(() => {
     void refetch()

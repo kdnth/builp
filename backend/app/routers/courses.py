@@ -13,6 +13,7 @@ from app.schemas.course import (
     Course,
     CourseDetail,
     CourseSummary,
+    CourseType,
     PaginatedCourses,
     UpdateTagsRequest,
     summarize,
@@ -49,6 +50,7 @@ def is_course_saved_by(db: Session, row: CourseModel, user_id: str) -> bool:
 def list_courses(
     q: str | None = None,
     tag: str | None = None,
+    course_type: CourseType | None = None,
     owner_user_id: str | None = None,
     for_user_id: str | None = None,
     limit: int = Query(24, ge=1, le=100),
@@ -59,6 +61,8 @@ def list_courses(
     query = select(CourseModel)
     if q:
         query = query.where(CourseModel.title.ilike(f"%{q}%"))
+    if course_type:
+        query = query.where(CourseModel.course_type == course_type)
     if owner_user_id:
         query = query.where(CourseModel.owner_user_id == owner_user_id)
     if for_user_id:
@@ -141,6 +145,7 @@ def create_course(
     row = CourseModel(
         id=new_id,
         title=course.title,
+        course_type=course.courseType,
         data=content,
         owner_user_id=user.id,
         forked_from_id=forked_from_id,

@@ -23,6 +23,9 @@ class Course(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     title: Mapped[str] = mapped_column(String, nullable=False)
+    course_type: Mapped[str] = mapped_column(
+        String, nullable=False, default="programming", server_default="programming"
+    )
     data: Mapped[dict] = mapped_column(JSON, nullable=False)
     owner_user_id: Mapped[str | None] = mapped_column(String, nullable=True)
     tags: Mapped[list[str]] = mapped_column(
@@ -87,9 +90,22 @@ class GenerationJob(Base):
     audience: Mapped[str] = mapped_column(String, nullable=False)
     num_units: Mapped[int] = mapped_column(Integer, nullable=False)
     lessons_per_unit: Mapped[int] = mapped_column(Integer, nullable=False)
+    course_type: Mapped[str] = mapped_column(
+        String, nullable=False, default="programming", server_default="programming"
+    )
     language: Mapped[str] = mapped_column(
         String, nullable=False, default="javascript", server_default="javascript"
     )
+    learning_goals: Mapped[str | None] = mapped_column(String, nullable=True)
+    level: Mapped[str] = mapped_column(
+        String, nullable=False, default="beginner", server_default="beginner"
+    )
+    notes: Mapped[str | None] = mapped_column(String, nullable=True)
+    reading_style: Mapped[str] = mapped_column(
+        String, nullable=False, default="single", server_default="single"
+    )
+    refusal_category: Mapped[str | None] = mapped_column(String, nullable=True)
+    refusal_reason: Mapped[str | None] = mapped_column(String, nullable=True)
     stage: Mapped[str | None] = mapped_column(String, nullable=True)
     lessons_total: Mapped[int | None] = mapped_column(Integer, nullable=True)
     lessons_completed: Mapped[int] = mapped_column(

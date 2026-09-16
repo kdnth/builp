@@ -11,6 +11,7 @@ from app.agent import prompts
 from app.agent.checks import (
     check_lesson_content,
     check_outline_lesson_count,
+    check_outline_lessons,
     check_overview_unit_count,
 )
 from app.agent.llm import (
@@ -20,6 +21,7 @@ from app.agent.llm import (
     invoke_structured,
 )
 from app.agent.schemas import (
+    CodePracticePolicy,
     CourseOverview,
     EvaluationResult,
     LessonContent,
@@ -28,7 +30,8 @@ from app.agent.schemas import (
 )
 from app.agent.solver import solve_activities
 from app.agent.stage import StageOutcome, run_stage_with_retries
-from app.schemas.course import CodeLanguage
+from app.schemas.course import CourseType
+from app.schemas.generation import CodePracticeChoice, LearnerLevel
 
 MAX_ATTEMPTS = 3
 
@@ -38,7 +41,11 @@ def generate_overview(
     topic: str,
     audience: str,
     num_units: int,
-    language: CodeLanguage,
+    course_type: CourseType,
+    language: CodePracticeChoice,
+    level: LearnerLevel,
+    learning_goals: str | None,
+    notes: str | None,
     model_config: GenerationModelConfig,
 ) -> StageOutcome[CourseOverview]:
     calls: list[CallUsage] = []
@@ -48,7 +55,11 @@ def generate_overview(
             topic=topic,
             audience=audience,
             num_units=num_units,
+            course_type=course_type,
             language=language,
+            level=level,
+            learning_goals=learning_goals,
+            notes=notes,
             feedback=feedback,
         )
         return invoke_structured(
@@ -85,7 +96,6 @@ def generate_unit_outline(
     overview: CourseOverview,
     unit: UnitSummary,
     lessons_per_unit: int,
-    language: CodeLanguage,
     model_config: GenerationModelConfig,
 ) -> StageOutcome[UnitOutline]:
     calls: list[CallUsage] = []
@@ -95,7 +105,6 @@ def generate_unit_outline(
             overview=overview,
             unit=unit,
             lessons_per_unit=lessons_per_unit,
-            language=language,
             feedback=feedback,
             provider=model_config.provider,
         )
@@ -126,12 +135,25 @@ def generate_unit_outline(
 
     return run_stage_with_retries(
         generate=generate,
-        check=lambda outline: check_outline_lesson_count(outline, lessons_per_unit),
+        check=lambda outline: (
+            check_outline_lesson_count(outline, lessons_per_unit)
+            + check_outline_lessons(outline, overview.brief)
+        ),
         evaluate=evaluate,
         default_tier="fast",
         max_attempts=MAX_ATTEMPTS,
         calls=calls,
     )
+
+
+def _lesson_code_language(
+    overview: CourseOverview, outline: UnitOutline, lesson_index: int
+) -> CodePracticePolicy:
+    """The language this lesson's code practice uses, or "none" when the
+    lesson should have no code practice at all."""
+    if not outline.lessons[lesson_index].include_code_practice:
+        return "none"
+    return overview.brief.code_practice_policy
 
 
 def generate_lesson_content(
@@ -140,7 +162,7 @@ def generate_lesson_content(
     unit: UnitSummary,
     outline: UnitOutline,
     lesson_index: int,
-    language: CodeLanguage,
+    course_map: str,
     model_config: GenerationModelConfig,
 ) -> StageOutcome[LessonContent]:
     calls: list[CallUsage] = []
@@ -151,7 +173,7 @@ def generate_lesson_content(
             unit=unit,
             outline=outline,
             lesson_index=lesson_index,
-            language=language,
+            course_map=course_map,
             feedback=feedback,
             provider=model_config.provider,
         )
@@ -183,7 +205,6 @@ def generate_lesson_content(
             unit=unit,
             outline=outline,
             lesson_index=lesson_index,
-            language=language,
             content=content,
             provider=model_config.provider,
         )
@@ -198,7 +219,9 @@ def generate_lesson_content(
 
     return run_stage_with_retries(
         generate=generate,
-        check=lambda content: check_lesson_content(content, language=language),
+        check=lambda content: check_lesson_content(
+            content, language=_lesson_code_language(overview, outline, lesson_index)
+        ),
         evaluate=evaluate,
         default_tier="standard",
         max_attempts=MAX_ATTEMPTS,

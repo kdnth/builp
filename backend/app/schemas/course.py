@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 # truth: it never trusts the frontend's own validation.
 
 CodeLanguage = Literal["javascript", "python"]
+CourseType = Literal["programming", "general"]
 
 
 class TestCase(BaseModel):
@@ -135,6 +136,7 @@ class Course(BaseModel):
 
     id: str = Field(min_length=1)
     title: str = Field(min_length=1)
+    courseType: CourseType = "programming"
     units: list[Unit] = Field(min_length=1)
     forkedFromId: str | None = None
 
@@ -142,6 +144,7 @@ class Course(BaseModel):
 class CourseSummary(BaseModel):
     id: str
     title: str
+    course_type: CourseType = "programming"
     unit_count: int
     lesson_count: int
     tags: list[str] = []
@@ -180,6 +183,7 @@ def summarize(
     return CourseSummary(
         id=course.id,
         title=course.title,
+        course_type=course.courseType,
         unit_count=len(course.units),
         lesson_count=lesson_count,
         tags=tags,

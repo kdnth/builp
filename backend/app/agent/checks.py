@@ -21,6 +21,8 @@ from app.agent.activity_checks import (
     check_multiple_choice_quality,
 )
 from app.agent.schemas import (
+    CodePracticePolicy,
+    CourseBrief,
     CourseOverview,
     GeneratedFillBlankActivity,
     GeneratedFunctionPractice,
@@ -51,6 +53,25 @@ def check_outline_lesson_count(outline: UnitOutline, expected: int) -> list[str]
             "were requested. Add or remove lessons to match exactly."
         ]
     return []
+
+
+def check_outline_lessons(outline: UnitOutline, brief: CourseBrief) -> list[str]:
+    """Each lesson must use a profile the brief allows, and a course with no
+    code practice must not ask for one."""
+    problems: list[str] = []
+    for index, lesson in enumerate(outline.lessons, start=1):
+        if lesson.profile not in brief.lesson_profiles:
+            problems.append(
+                f"lesson {index} uses profile '{lesson.profile}', which is not "
+                f"one of the course's profiles "
+                f"({', '.join(brief.lesson_profiles)})"
+            )
+        if lesson.include_code_practice and brief.code_practice_policy == "none":
+            problems.append(
+                f"lesson {index} asks for a code practice, but this course has "
+                "no code practice"
+            )
+    return problems
 
 
 def _function_name(signature: str) -> str:
@@ -187,7 +208,10 @@ def _run_check_script(command: list[str], script: str, suffix: str) -> str | Non
             env={"PATH": os.environ.get("PATH", "")},
         )
     except FileNotFoundError:
-        return None
+        return (
+            f"the {command[0]} runtime is not installed on the server, so the "
+            "reference solution could not be checked"
+        )
     except subprocess.TimeoutExpired:
         return "reference solution timed out (possible infinite loop)"
     finally:
@@ -260,7 +284,7 @@ def check_multiple_choice_consistency(
 
 
 def check_lesson_content(
-    content: LessonContent, *, language: CodeLanguage
+    content: LessonContent, *, language: CodePracticePolicy
 ) -> list[str]:
     """Every deterministic check applicable to a generated lesson.
 
@@ -269,11 +293,17 @@ def check_lesson_content(
     problems: list[str] = []
 
     if content.code_practice is not None:
-        problem = check_function_practice_consistency(
-            content.code_practice, language=language
-        )
-        if problem:
-            problems.append(problem)
+        if language == "none":
+            problems.append(
+                "this lesson has a code practice, but this lesson was asked "
+                "not to have one"
+            )
+        else:
+            problem = check_function_practice_consistency(
+                content.code_practice, language=language
+            )
+            if problem:
+                problems.append(problem)
 
     for activity in content.interactive_activities:
         if activity.type == "fillBlank":

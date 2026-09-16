@@ -2,22 +2,26 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   Alert,
+  Badge,
   Button,
   Container,
+  Group,
   Loader,
   Paper,
   Progress,
   Stack,
   Text,
+  ThemeIcon,
   Title,
 } from '@mantine/core'
-import { WarningCircleIcon } from '@phosphor-icons/react'
+import { SignpostIcon, WarningCircleIcon } from '@phosphor-icons/react'
 import { ApiError, getGenerationJob, type GenerationJob } from '../../lib/api'
 import { unwatchJobId } from './generationJobsStore'
 import {
   lessonProgressText,
   progressLabel,
   progressPercent,
+  refusalCategoryLabel,
 } from './generationProgress'
 
 const POLL_INTERVAL_MS = 2000
@@ -86,6 +90,44 @@ export default function GenerationJobPage() {
         >
           {error}
         </Alert>
+      </Container>
+    )
+  }
+
+  if (job?.status === 'refused') {
+    return (
+      <Container size="xs" py="xl">
+        <Paper withBorder radius="md" p="xl">
+          <Stack gap="md" align="center" ta="center">
+            <ThemeIcon size={56} radius="xl" variant="light" color="yellow">
+              <SignpostIcon size={30} weight="fill" />
+            </ThemeIcon>
+            <Stack gap={6} align="center">
+              <Title order={2}>This topic is not a fit</Title>
+              <Badge color="yellow" variant="light">
+                {refusalCategoryLabel(job.refusal_category)}
+              </Badge>
+            </Stack>
+            <Text size="sm">{job.refusal_reason}</Text>
+            <Text c="dimmed" size="sm">
+              Courses that study a subject are fine, including hard ones. What
+              this cannot do is give advice for your own case, or explain how to
+              cause harm.
+            </Text>
+            <Group justify="center" gap="sm">
+              <Button
+                onClick={() =>
+                  navigate('/courses/generate', { state: { job } })
+                }
+              >
+                Edit this request
+              </Button>
+              <Button component={Link} to="/" variant="default">
+                Back to courses
+              </Button>
+            </Group>
+          </Stack>
+        </Paper>
       </Container>
     )
   }

@@ -176,29 +176,10 @@ def test_a_lesson_without_solvable_activities_makes_no_call():
 
 def test_lesson_evaluation_skips_the_judge_when_the_solver_objects():
     from app.agent import nodes
-    from app.agent.schemas import (
-        CourseOverview,
-        LessonSummary,
-        UnitOutline,
-        UnitSummary,
-    )
+    from tests.factories import make_outline, make_overview
 
-    overview = CourseOverview(
-        title="C",
-        description="d",
-        audience="a",
-        units=[UnitSummary(title="U", goal="g")],
-    )
-    outline = UnitOutline(
-        lessons=[
-            LessonSummary(
-                title="L",
-                goal="g",
-                include_code_practice=False,
-                interactive_activity_types=["multipleChoice"],
-            )
-        ]
-    )
+    overview = make_overview()
+    outline = make_outline(activity_types=["multipleChoice"])
     content = LessonContent(
         written_lesson_markdown="# L", code_practice=None, interactive_activities=[]
     )
@@ -219,7 +200,7 @@ def test_lesson_evaluation_skips_the_judge_when_the_solver_objects():
             unit=overview.units[0],
             outline=outline,
             lesson_index=0,
-            language="python",
+            course_map="Course map:",
             model_config=MODEL_CONFIG,
         )
 

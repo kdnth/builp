@@ -25,7 +25,7 @@ from app.models import GenerationStageMetric
 
 logger = logging.getLogger(__name__)
 
-StageName = Literal["overview", "unit_outline", "lesson_content"]
+StageName = Literal["screening", "overview", "unit_outline", "lesson_content"]
 
 
 @dataclass

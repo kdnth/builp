@@ -50,6 +50,8 @@ def _enforce_free_credit_rate_limit(*, db: Session, user: AuthenticatedUser) -> 
         .filter(
             GenerationJob.owner_user_id == user.id,
             GenerationJob.created_at >= window_start,
+            # A refused job costs one fast call, so it must not use the credit.
+            GenerationJob.status != "refused",
         )
         .order_by(GenerationJob.created_at.desc())
         .first()

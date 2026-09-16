@@ -1,6 +1,5 @@
 from app.agent.assemble import assemble_course, assemble_lesson
 from app.agent.schemas import (
-    CourseOverview,
     GeneratedFillBlankActivity,
     GeneratedFunctionPractice,
     GeneratedMultipleChoiceActivity,
@@ -8,6 +7,7 @@ from app.agent.schemas import (
     LessonContent,
     UnitSummary,
 )
+from tests.factories import make_overview
 
 
 def test_assemble_lesson_with_code_and_activities():
@@ -93,10 +93,8 @@ def test_assemble_lesson_sets_python_language_on_code_practice():
 
 
 def test_assemble_course_matches_real_schema():
-    overview = CourseOverview(
+    overview = make_overview(
         title="Intro to JS",
-        description="Learn the basics.",
-        audience="Complete beginners.",
         units=[
             UnitSummary(title="Unit One", goal="Cover the basics."),
             UnitSummary(title="Unit Two", goal="Build on unit one."),

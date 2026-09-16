@@ -98,6 +98,7 @@ const unitSchema = z.object({
 export const courseSchema = z.object({
   id: z.string().min(1),
   title: z.string().min(1),
+  courseType: z.enum(['programming', 'general']).default('programming'),
   units: z.array(unitSchema).min(1),
   forkedFromId: z.string().min(1).nullable().optional(),
 })

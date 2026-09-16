@@ -1,4 +1,4 @@
-import type { Course } from '../types/course'
+import type { Course, CourseType } from '../types/course'
 import type { CodeLanguage } from '../types/codeLanguage'
 import { getJWTToken } from './auth'
 
@@ -148,7 +148,10 @@ function responsePath(response: Response): string | null {
   }
 }
 
-async function ensureOk(response: Response, fallbackMessage: string): Promise<void> {
+async function ensureOk(
+  response: Response,
+  fallbackMessage: string,
+): Promise<void> {
   if (response.ok) {
     return
   }
@@ -191,6 +194,7 @@ async function parseVoidOrThrow(
 export interface CourseSummary {
   id: string
   title: string
+  course_type: CourseType
   unit_count: number
   lesson_count: number
   tags: string[]
@@ -212,6 +216,7 @@ export type CourseDetail = Course & {
 export async function listCourses(params?: {
   q?: string
   tag?: string
+  courseType?: CourseType
   ownerUserId?: string
   // "My Courses" membership: owned by this user OR saved by them.
   forUserId?: string
@@ -221,6 +226,7 @@ export async function listCourses(params?: {
   const query = new URLSearchParams()
   if (params?.q) query.set('q', params.q)
   if (params?.tag) query.set('tag', params.tag)
+  if (params?.courseType) query.set('course_type', params.courseType)
   if (params?.ownerUserId) query.set('owner_user_id', params.ownerUserId)
   if (params?.forUserId) query.set('for_user_id', params.forUserId)
   if (params?.limit != null) query.set('limit', String(params.limit))
@@ -302,8 +308,13 @@ export async function completeLesson(
 
 // --- Course generation ---------------------------------------------------
 
-export type GenerationJobStatus = 'pending' | 'running' | 'succeeded' | 'failed'
-export type GenerationStage = 'outline' | 'units' | 'lessons' | 'assembling'
+export type GenerationJobStatus =
+  'pending' | 'running' | 'succeeded' | 'failed' | 'refused'
+export type GenerationStage =
+  'screening' | 'outline' | 'units' | 'lessons' | 'assembling'
+export type CodePracticeChoice = CodeLanguage | 'none' | 'auto'
+export type LearnerLevel = 'beginner' | 'intermediate' | 'advanced'
+export type ReadingStyle = 'single' | 'interleaved'
 
 export interface GenerationJob {
   id: string
@@ -312,12 +323,19 @@ export interface GenerationJob {
   audience: string
   num_units: number
   lessons_per_unit: number
-  language: CodeLanguage
+  course_type: CourseType
+  language: CodePracticeChoice
+  learning_goals: string | null
+  level: LearnerLevel
+  notes: string | null
+  reading_style: ReadingStyle
   stage: GenerationStage | null
   lessons_total: number | null
   lessons_completed: number
   course_id: string | null
   error: string | null
+  refusal_category: string | null
+  refusal_reason: string | null
   created_at: string
   updated_at: string
 }
@@ -327,7 +345,11 @@ interface SharedCreateGenerationJobInput {
   audience: string
   num_units: number
   lessons_per_unit: number
-  language: CodeLanguage
+  course_type: CourseType
+  language: CodePracticeChoice
+  learning_goals?: string | null
+  level: LearnerLevel
+  notes?: string | null
 }
 
 export type GenerationMode = 'free_credit' | 'provider_api_key'

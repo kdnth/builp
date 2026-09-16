@@ -56,6 +56,72 @@ class UnitSummary(BaseModel):
     )
 
 
+LessonProfile = Literal[
+    "conceptual",
+    "procedural",
+    "quantitative",
+    "narrative",
+    "language",
+    "programming",
+]
+Sensitivity = Literal["none", "health", "legal", "financial", "safety"]
+CodePracticePolicy = Literal["none", "python", "javascript"]
+
+
+class GlossaryTerm(BaseModel):
+    term: str
+    definition: str = Field(description="One line, in plain words.")
+
+
+class CourseBrief(BaseModel):
+    """Shared context every later stage reads. Lessons are written in
+    parallel, so without this they drift apart in terms and depth."""
+
+    domain: str = Field(
+        description="The field this course sits in, e.g. 'Macroeconomics'."
+    )
+    lesson_profiles: list[LessonProfile] = Field(
+        min_length=1,
+        max_length=3,
+        description="The kinds of lesson this course needs. Every lesson in "
+        "the course must use one of these.",
+    )
+    learning_objectives: list[str] = Field(
+        min_length=3,
+        max_length=6,
+        description="What the learner can do at the end. Each one must be "
+        "observable, not 'understand X'.",
+    )
+    prerequisites: list[str] = Field(
+        default_factory=list, description="What the learner must already know."
+    )
+    glossary: list[GlossaryTerm] = Field(
+        default_factory=list,
+        max_length=30,
+        description="Key terms with one-line definitions. Every lesson uses "
+        "these words with these meanings.",
+    )
+    misconceptions: list[str] = Field(
+        default_factory=list,
+        description="Common wrong beliefs about this topic. Use them as wrong "
+        "options in multiple choice activities.",
+    )
+    conventions: str = Field(
+        default="",
+        description="Units, notation, date format, spelling variant, or "
+        "dialect this course uses.",
+    )
+    sensitivity: Sensitivity = Field(
+        default="none",
+        description="Whether this subject touches health, legal, financial, "
+        "or safety decisions.",
+    )
+    code_practice_policy: CodePracticePolicy = Field(
+        description="Which language runnable code practices use, or 'none' "
+        "when this course should have no code practice."
+    )
+
+
 class CourseOverview(BaseModel):
     title: str
     description: str = Field(description="A short, learner-facing course summary.")
@@ -67,6 +133,7 @@ class CourseOverview(BaseModel):
         description="Ordered list of units, in the order a learner should take them.",
         min_length=1,
     )
+    brief: CourseBrief
 
 
 # --- Stage 2: unit outline (one call per unit) -------------------------
@@ -77,8 +144,14 @@ class LessonSummary(BaseModel):
     goal: str = Field(
         description="What the learner should be able to do after this lesson."
     )
+    profile: LessonProfile = Field(
+        description="The kind of lesson this is. Must be one of the course "
+        "brief's lesson_profiles."
+    )
     include_code_practice: bool = Field(
-        description="Whether this lesson should include a runnable code exercise."
+        description="Whether this lesson should include a runnable code "
+        "exercise. Only possible when the brief's code_practice_policy is "
+        "not 'none'."
     )
     interactive_activity_types: list[
         Literal["matching", "fillBlank", "multipleChoice"]
@@ -214,3 +287,32 @@ class SolvedActivity(BaseModel):
 
 class ActivitySolutions(BaseModel):
     activities: list[SolvedActivity]
+
+
+# --- Screening ---------------------------------------------------------
+
+
+RefusalCategory = Literal[
+    "none",
+    "operational_harm",
+    "individual_medical_advice",
+    "individual_legal_advice",
+    "individual_financial_advice",
+    "sexual_content",
+    "hate_or_harassment",
+]
+
+
+class ScreeningDecision(BaseModel):
+    allowed: bool = Field(
+        description="True when this app can teach the topic as a course."
+    )
+    category: RefusalCategory = Field(
+        default="none",
+        description="Why the topic is refused. 'none' when it is allowed.",
+    )
+    reason: str = Field(
+        default="",
+        description="One sentence for the learner, in plain words, saying "
+        "what cannot be generated. Empty when the topic is allowed.",
+    )
