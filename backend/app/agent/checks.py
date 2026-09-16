@@ -15,6 +15,11 @@ import sys
 import tempfile
 from pathlib import Path
 
+from app.agent.activity_checks import (
+    check_activity_grounding,
+    check_fill_blank_answerability,
+    check_multiple_choice_quality,
+)
 from app.agent.schemas import (
     CourseOverview,
     GeneratedFillBlankActivity,
@@ -273,11 +278,16 @@ def check_lesson_content(
     for activity in content.interactive_activities:
         if activity.type == "fillBlank":
             problem = check_fill_blank_consistency(activity)
+            problems.extend(check_fill_blank_answerability(activity))
         elif activity.type == "multipleChoice":
             problem = check_multiple_choice_consistency(activity)
+            problems.extend(check_multiple_choice_quality(activity))
         else:
             problem = None
         if problem:
             problems.append(problem)
+        problems.extend(
+            check_activity_grounding(activity, content.written_lesson_markdown)
+        )
 
     return problems

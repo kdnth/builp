@@ -23,7 +23,7 @@ load_dotenv()
 
 ModelTier = Literal["fast", "standard", "strong"]
 SupportedProvider = Literal["anthropic"]
-CallPurpose = Literal["generate", "evaluate"]
+CallPurpose = Literal["generate", "evaluate", "solve"]
 
 
 @dataclass(frozen=True)

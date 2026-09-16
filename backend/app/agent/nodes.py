@@ -26,6 +26,7 @@ from app.agent.schemas import (
     UnitOutline,
     UnitSummary,
 )
+from app.agent.solver import solve_activities
 from app.agent.stage import StageOutcome, run_stage_with_retries
 from app.schemas.course import CodeLanguage
 
@@ -164,6 +165,19 @@ def generate_lesson_content(
         )
 
     def evaluate(content: LessonContent) -> EvaluationResult:
+        ambiguity = solve_activities(
+            content=content, model_config=model_config, calls=calls
+        )
+        if ambiguity:
+            return EvaluationResult(
+                passed=False,
+                score=2,
+                feedback=(
+                    "A reader who only had this lesson could not answer the "
+                    "activities as written: " + "; ".join(ambiguity)
+                ),
+            )
+
         messages = prompts.lesson_content_evaluate_prompt(
             overview=overview,
             unit=unit,

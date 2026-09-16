@@ -211,12 +211,27 @@ signature for this lesson's concept that only needs plain data values as \
 arguments, even if the lesson's written content and interactive \
 activities do cover callbacks.
 
+Every activity must have exactly one defensible answer, and the learner \
+must be able to find that answer in this lesson. If a reasonable learner \
+could give a different answer that is also correct, the activity is wrong, \
+even when your answer key is one of the correct answers.
+
 For a fillBlank activity: write text with each blank as the literal \
 token {{{{blank}}}}, and provide one entry in blanks for each token, in \
-the same order they appear in the text.
+the same order they appear in the text. Blank only a token that the lesson \
+and the sentence determine: a keyword, an operator, a term, or a required \
+value. Never blank a value the author is free to choose, such as an \
+argument in an example call, sample data, or a variable name. Write those \
+values into the template instead. Use at most 3 blanks, and always keep a \
+word between two blanks. In `accepted`, list only different writings of \
+the same answer (upper and lower case, spacing, accents, US and UK \
+spelling), never different answers. If a slot could hold several correct \
+values, either fix the value in the template or ask about it with a \
+multipleChoice activity.
 
-For a multipleChoice activity: wrong options should be plausible, not \
-obviously silly.
+For a multipleChoice activity: exactly one option is defensible. Wrong \
+options should be plausible, not obviously silly. Do not make the correct \
+option the longest one, and do not repeat the question's wording in it.
 
 Match the difficulty to the lesson goal and the course's stated audience. \
 Every activity should actually test the lesson's specific goal, not \
@@ -268,7 +283,7 @@ def lesson_content_generate_prompt(
 
 
 LESSON_CONTENT_EVAL_SYSTEM = """You are a strict reviewer judging one \
-lesson's content against three criteria (a code test correctness check \
+lesson's content against four criteria (a code test correctness check \
 has already run separately; don't re-check that):
 
 1. Accuracy: is the written content factually correct?
@@ -276,6 +291,9 @@ has already run separately; don't re-check that):
    audience, not assuming knowledge that hasn't been taught yet?
 3. Activity relevance: does each interactive activity actually test the \
    lesson's specific goal, rather than something generic or unrelated?
+4. Answerability: does each activity have exactly one defensible answer \
+   that a learner can find in this lesson? An activity a reasonable learner \
+   could answer differently, and still be right, fails this.
 
 Score 1-5. Pass only if genuinely usable as-is. Be specific: quote the \
 problem passage or activity and say exactly what's wrong."""
@@ -304,3 +322,29 @@ def lesson_content_evaluate_prompt(
         f"{content.model_dump_json(indent=2)}"
     )
     return [system, HumanMessage(content=human)]
+
+
+# --- Activity solver -----------
+
+SOLVER_SYSTEM = """You are a careful learner taking a short quiz. You are \
+given one lesson and its activities. The answer key is not shown to you.
+
+For each activity, answer it using only the lesson, then say whether \
+another answer would be equally correct.
+
+Answer format:
+- multipleChoice: write the exact text of the option you choose.
+- fillBlank: write the answers for the blanks in order, separated by ' | '.
+
+Set other_defensible_answer only when a different answer is just as \
+correct as yours, for example when the text does not say which value \
+belongs in a blank, or when two options are both true. Write that other \
+answer in the same format. Leave it empty when the lesson forces one \
+answer."""
+
+
+def solver_prompt(
+    *, written_lesson_markdown: str, activities_text: str
+) -> list[BaseMessage]:
+    human = f"Lesson:\n\n{written_lesson_markdown}\n\nActivities:\n\n{activities_text}"
+    return [SystemMessage(content=SOLVER_SYSTEM), HumanMessage(content=human)]

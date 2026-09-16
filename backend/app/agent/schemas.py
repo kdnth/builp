@@ -194,3 +194,23 @@ class EvaluationResult(BaseModel):
         description="Specific and actionable. If passed, briefly say what's "
         "good. If not, say exactly what to fix."
     )
+
+
+# --- Activity solver ---------------------------------------------------
+
+
+class SolvedActivity(BaseModel):
+    activity_number: int = Field(description="The number shown in the prompt.")
+    answer: str = Field(
+        description="The option text for multipleChoice, or the blank answers "
+        "in order separated by ' | ' for fillBlank."
+    )
+    other_defensible_answer: str = Field(
+        default="",
+        description="Another answer that is equally correct, in the same "
+        "format. Empty when the lesson forces one answer.",
+    )
+
+
+class ActivitySolutions(BaseModel):
+    activities: list[SolvedActivity]
