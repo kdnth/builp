@@ -36,8 +36,6 @@ class Settings(BaseSettings):
     neon_auth_jwks_url: str | None = None
     neon_auth_issuer: str | None = None
 
-    # Transactional email (Resend). Unset means feedback is stored but no
-    # mail goes out - see app/email.py.
     resend_api_key: str | None = None
     feedback_from_email: str = "builp <noreply@kdnth.co>"
     support_email: str = "support@kdnth.co"

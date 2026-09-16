@@ -50,8 +50,6 @@ def send_email(
         )
         response.raise_for_status()
     except httpx.HTTPError:
-        # Logged without the payload: feedback bodies are user-submitted text
-        # and reply_to is a personal address.
         logger.exception("Could not send %r to %s", subject, to)
         return False
     return True
