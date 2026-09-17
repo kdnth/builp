@@ -17,6 +17,8 @@ import {
 } from '../../helpers/activityMessages'
 import ActivityHeader from './ActivityHeader'
 import ActivityAlert from './ActivityAlert'
+import ActivityExplanation from './ActivityExplanation'
+import LessonMarkdown from './LessonMarkdown'
 
 interface MultipleChoiceComponentProps {
   activity: MultipleChoice
@@ -93,7 +95,19 @@ export default function MultipleChoiceComponent({
           status={status}
           onRedo={handleRedo}
         />
-        <Text>{activity.question}</Text>
+        {activity.passage && (
+          <Paper
+            withBorder
+            radius="md"
+            p="md"
+            bg="var(--mantine-color-default-hover)"
+          >
+            <LessonMarkdown>{activity.passage}</LessonMarkdown>
+          </Paper>
+        )}
+        <Text>
+          <LessonMarkdown inline>{activity.question}</LessonMarkdown>
+        </Text>
         <ChipGroup value={value} onChange={setValue}>
           {activity.options.map((o, idx) => {
             const isSelected = value === idx.toString()
@@ -119,12 +133,33 @@ export default function MultipleChoiceComponent({
                     : undefined,
                 }}
               >
-                {questionLabels[idx]}. {o}
+                {questionLabels[idx]}.{' '}
+                <LessonMarkdown inline>{o}</LessonMarkdown>
               </Chip>
             )
           })}
         </ChipGroup>
         <ActivityAlert status={status} message={message} />
+        {resolved && activity.optionExplanations && (
+          <Stack gap={4}>
+            {activity.options.map((_option, idx) => (
+              <Text
+                key={idx}
+                size="sm"
+                c={idx === activity.correctIndex ? undefined : 'dimmed'}
+              >
+                {questionLabels[idx]}.{' '}
+                <LessonMarkdown inline>
+                  {activity.optionExplanations?.[idx] ?? ''}
+                </LessonMarkdown>
+              </Text>
+            ))}
+          </Stack>
+        )}
+        <ActivityExplanation
+          explanation={activity.explanation}
+          show={resolved}
+        />
         <Group gap="xs">
           <Button
             disabled={value === null || resolved}

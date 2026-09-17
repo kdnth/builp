@@ -10,6 +10,7 @@ import {
 } from '../../helpers/activityMessages'
 import ActivityHeader from './ActivityHeader'
 import ActivityAlert from './ActivityAlert'
+import ActivityExplanation from './ActivityExplanation'
 import MatchingTile from './activity-components/MatchingTile'
 
 interface MatchingComponentProps {
@@ -193,6 +194,10 @@ export default function MatchingComponent({
           </Grid.Col>
         </Grid>
         <ActivityAlert status={status} message={message} />
+        <ActivityExplanation
+          explanation={activity.explanation}
+          show={isComplete || revealed}
+        />
         {!isComplete && attempts >= maxAttempts && (
           <Group gap="xs">
             <Button variant="outline" color="yellow" onClick={handleShowAnswer}>

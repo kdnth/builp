@@ -32,15 +32,18 @@ LANGUAGE_NAMES: dict[str, str] = {
 PROFILE_GUIDANCE: dict[LessonProfile, str] = {
     "conceptual": "This is a concept lesson. Define each term precisely, "
     "contrast it with the idea it is most often confused with, and give one "
-    "example and one non-example.",
+    "example and one non-example. A categorize activity suits it well.",
     "procedural": "This is a procedure lesson. Give the steps in order, say "
-    "when each step applies, and call out the step learners skip most often.",
+    "when each step applies, and call out the step learners skip most often. "
+    "An ordering activity suits it well.",
     "quantitative": "This is a quantitative lesson. State each formula "
     "plainly, then work one full example step by step with units on every "
-    "line. Keep the numbers small enough to check by hand.",
+    "line. Keep the numbers small enough to check by hand. A numeric "
+    "activity suits it well.",
     "narrative": "This is a narrative lesson. Give dates, the people or "
     "groups involved, and cause and effect. Where historians disagree, say "
-    "that it is contested instead of picking one side.",
+    "that it is contested instead of picking one side. An ordering activity "
+    "on a timeline suits it well.",
     "language": "This is a language lesson. Show the target language with "
     "its translation, keep sentences short, and mark gender, accents, and "
     "register where they matter.",
@@ -51,11 +54,12 @@ PROFILE_GUIDANCE: dict[LessonProfile, str] = {
 READING_STYLE_PLAN: dict[ReadingStyle, str] = {
     "single": "Write the lesson as one section that holds the whole "
     "explanation, and put every activity in that one section. The learner "
-    "reads it all, then practices.",
+    "reads it all, then practices. Up to 8 activities.",
     "interleaved": "Split the lesson into 2 to 4 sections, each with its own "
     "short heading. After a section that introduces something worth "
     "checking, add 1 or 2 activities that test that section only, not the "
-    "whole lesson. The last section ends the lesson.",
+    "whole lesson. The last section ends the lesson, and may end with a "
+    "longer set of activities that reviews the whole lesson.",
 }
 
 PROFILE_REVIEW_CRITERIA: dict[LessonProfile, str] = {
@@ -394,7 +398,29 @@ multipleChoice activity.
 
 For a multipleChoice activity: exactly one option is defensible. Wrong \
 options should be plausible, not obviously silly. Do not make the correct \
-option the longest one, and do not repeat the question's wording in it.
+option the longest one, and do not repeat the question's wording in it. \
+Use `passage` when the question needs a case, a quote, or a small data \
+table to reason about. Use `option_explanations` to say why each option is \
+right or wrong, one for every option or none at all.
+
+For an ordering activity: only use it when one order is truly correct, and \
+say what decides it in `basis` (for example 'chronological' or 'process \
+steps'). Never order things by preference or importance. List `items` in \
+the correct order; the learner sees them shuffled.
+
+For a categorize activity: every item belongs in exactly one category, and \
+every category gets at least one item. An item that could sit in two \
+categories is wrong.
+
+For a numeric activity: the question must contain every number needed. \
+Write `answer_expression` as a Python expression that computes the answer \
+from those numbers, using only arithmetic and the math module. The server \
+runs it and compares it with `answer`. Set `tolerance` when the answer is \
+rounded, and name the `unit` when it has one.
+
+Write an `explanation` for every activity: one or two sentences telling \
+the learner why the answer is right. The learner reads it after they \
+answer, so it should teach, not just repeat the answer.
 
 Match the difficulty to the lesson goal and the course's stated audience. \
 Every activity should actually test the lesson's specific goal, not \

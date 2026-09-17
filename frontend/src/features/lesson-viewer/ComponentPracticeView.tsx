@@ -15,7 +15,9 @@ function detectTemplate(files: Record<string, string>): 'react-ts' | 'react' {
   return isTypeScript ? 'react-ts' : 'react'
 }
 
-export default function ComponentPracticeView({ view }: ComponentPracticeViewProps) {
+export default function ComponentPracticeView({
+  view,
+}: ComponentPracticeViewProps) {
   return (
     <Paper withBorder radius="md" p="lg" shadow="sm">
       <Stack gap="sm">

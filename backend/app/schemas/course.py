@@ -68,6 +68,7 @@ class MatchingActivity(BaseModel):
     type: Literal["matching"]
     id: str = Field(min_length=1)
     description: str | None = None
+    explanation: str | None = None
     pairs: list[MatchingPair] = Field(min_length=1)
 
 
@@ -84,6 +85,7 @@ class FillBlankActivity(BaseModel):
     type: Literal["fillBlank"]
     id: str = Field(min_length=1)
     description: str | None = None
+    explanation: str | None = None
     text: str = Field(min_length=1)
     blanks: list[Blank] = Field(min_length=1)
 
@@ -94,13 +96,70 @@ class MultipleChoiceActivity(BaseModel):
     type: Literal["multipleChoice"]
     id: str = Field(min_length=1)
     description: str | None = None
+    explanation: str | None = None
+    passage: str | None = Field(
+        default=None, description="Markdown shown above the question."
+    )
     question: str = Field(min_length=1)
     options: list[str] = Field(min_length=2)
+    optionExplanations: list[str] | None = None
     correctIndex: int = Field(ge=0)
 
 
+class OrderingActivity(BaseModel):
+    """`items` are stored in the correct order. The viewer shuffles them."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    type: Literal["ordering"]
+    id: str = Field(min_length=1)
+    description: str | None = None
+    explanation: str | None = None
+    basis: str = Field(
+        min_length=1, description="What the order follows, e.g. 'chronological'."
+    )
+    items: list[str] = Field(min_length=3, max_length=8)
+
+
+class CategorizeItem(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = Field(min_length=1)
+    text: str = Field(min_length=1)
+    category: str = Field(min_length=1)
+
+
+class CategorizeActivity(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    type: Literal["categorize"]
+    id: str = Field(min_length=1)
+    description: str | None = None
+    explanation: str | None = None
+    categories: list[str] = Field(min_length=2, max_length=4)
+    items: list[CategorizeItem] = Field(min_length=3, max_length=8)
+
+
+class NumericActivity(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    type: Literal["numeric"]
+    id: str = Field(min_length=1)
+    description: str | None = None
+    explanation: str | None = None
+    question: str = Field(min_length=1)
+    answer: float
+    tolerance: float = Field(default=0, ge=0)
+    unit: str | None = None
+
+
 InteractiveActivity = Annotated[
-    MatchingActivity | FillBlankActivity | MultipleChoiceActivity,
+    MatchingActivity
+    | FillBlankActivity
+    | MultipleChoiceActivity
+    | OrderingActivity
+    | CategorizeActivity
+    | NumericActivity,
     Field(discriminator="type"),
 ]
 

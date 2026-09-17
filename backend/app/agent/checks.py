@@ -17,8 +17,11 @@ from pathlib import Path
 
 from app.agent.activity_checks import (
     check_activity_grounding,
+    check_categorize_answerability,
     check_fill_blank_answerability,
     check_multiple_choice_quality,
+    check_option_explanations,
+    check_ordering_answerability,
 )
 from app.agent.schemas import (
     CodePracticePolicy,
@@ -27,6 +30,7 @@ from app.agent.schemas import (
     GeneratedFillBlankActivity,
     GeneratedFunctionPractice,
     GeneratedMultipleChoiceActivity,
+    GeneratedNumericActivity,
     LessonContent,
     UnitOutline,
 )
@@ -262,6 +266,58 @@ def check_function_practice_consistency(
     return _run_check_script(["node"], script, ".js")
 
 
+_NUMERIC_CHECK_TEMPLATE = """
+import json
+import math
+
+expression = %(expression)s
+answer = %(answer)s
+tolerance = %(tolerance)s
+
+SAFE = {"__builtins__": {}, "math": math, "abs": abs, "round": round}
+
+
+def report(ok, problem=None):
+    print()
+    print(json.dumps({"ok": ok, "problem": problem}))
+    raise SystemExit(0)
+
+
+try:
+    value = eval(expression, SAFE)
+except Exception as exc:
+    report(False, f"answer_expression failed: {type(exc).__name__}: {exc}")
+
+try:
+    value = float(value)
+except (TypeError, ValueError):
+    report(False, f"answer_expression returned {value!r}, which is not a number")
+
+if abs(value - answer) <= max(tolerance, 1e-9):
+    report(True)
+
+report(
+    False,
+    f"answer_expression computes {value}, but answer says {answer} "
+    f"(tolerance {tolerance})",
+)
+"""
+
+
+def check_numeric_consistency(activity: GeneratedNumericActivity) -> str | None:
+    """Run the model's own expression and compare it with the answer it wrote.
+
+    This is what the reference solution check does for code: the number is
+    verified by running something, not by trusting the model twice.
+    """
+    script = _NUMERIC_CHECK_TEMPLATE % {
+        "expression": repr(activity.answer_expression),
+        "answer": repr(float(activity.answer)),
+        "tolerance": repr(float(activity.tolerance)),
+    }
+    return _run_check_script([sys.executable, "-I"], script, ".py")
+
+
 def check_fill_blank_consistency(activity: GeneratedFillBlankActivity) -> str | None:
     blank_count = activity.text.count("{{blank}}")
     if blank_count != len(activity.blanks):
@@ -312,6 +368,15 @@ def check_lesson_content(
         elif activity.type == "multipleChoice":
             problem = check_multiple_choice_consistency(activity)
             problems.extend(check_multiple_choice_quality(activity))
+            problems.extend(check_option_explanations(activity))
+        elif activity.type == "ordering":
+            problem = None
+            problems.extend(check_ordering_answerability(activity))
+        elif activity.type == "categorize":
+            problem = None
+            problems.extend(check_categorize_answerability(activity))
+        elif activity.type == "numeric":
+            problem = check_numeric_consistency(activity)
         else:
             problem = None
         if problem:

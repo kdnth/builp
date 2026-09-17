@@ -1,7 +1,15 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import type { Course } from '../../types/course'
-import { Anchor, Box, Container, Paper, Stack, Stepper, Title } from '@mantine/core'
+import {
+  Anchor,
+  Box,
+  Container,
+  Paper,
+  Stack,
+  Stepper,
+  Title,
+} from '@mantine/core'
 import { CheckCircleIcon, LockIcon } from '@phosphor-icons/react'
 import LessonComponent from './LessonComponent'
 import { isLessonComplete, isLessonUnlocked } from '../../helpers/progress'

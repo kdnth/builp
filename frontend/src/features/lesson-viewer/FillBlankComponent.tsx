@@ -9,6 +9,7 @@ import {
 } from '../../helpers/activityMessages'
 import ActivityHeader from './ActivityHeader'
 import ActivityAlert from './ActivityAlert'
+import ActivityExplanation from './ActivityExplanation'
 
 interface FillBlankComponentProps {
   activity: FillBlank
@@ -117,11 +118,17 @@ export default function FillBlankComponent({
           ))}
         </Group>
         <ActivityAlert status={status} message={message} />
+        <ActivityExplanation
+          explanation={activity.explanation}
+          show={resolved}
+        />
         <Group gap="xs">
           <Button
             disabled={resolved || answers.some((a) => a.trim() === '')}
             onClick={handleSubmit}
-            color={status === 'incorrect' ? 'red' : passed ? 'green' : undefined}
+            color={
+              status === 'incorrect' ? 'red' : passed ? 'green' : undefined
+            }
             styles={{
               root: resolved
                 ? {

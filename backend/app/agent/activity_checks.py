@@ -20,9 +20,12 @@ import unicodedata
 from difflib import SequenceMatcher
 
 from app.agent.schemas import (
+    GeneratedActivity,
+    GeneratedCategorizeActivity,
     GeneratedFillBlankActivity,
     GeneratedMatchingActivity,
     GeneratedMultipleChoiceActivity,
+    GeneratedOrderingActivity,
 )
 
 BLANK_TOKEN = "{{blank}}"
@@ -170,6 +173,58 @@ def check_multiple_choice_quality(
     return problems
 
 
+def check_ordering_answerability(activity: GeneratedOrderingActivity) -> list[str]:
+    problems: list[str] = []
+    if len({normalize(item) for item in activity.items}) != len(activity.items):
+        problems.append("ordering repeats an item, so the order is not one order")
+    if not activity.basis.strip():
+        problems.append("ordering has no basis, so nothing says which order is correct")
+    return problems
+
+
+def check_categorize_answerability(
+    activity: GeneratedCategorizeActivity,
+) -> list[str]:
+    problems: list[str] = []
+    categories = {normalize(category) for category in activity.categories}
+
+    for item in activity.items:
+        if normalize(item.category) not in categories:
+            problems.append(
+                f'categorize puts "{item.text}" in category "{item.category}", '
+                f"which is not one of {', '.join(activity.categories)}"
+            )
+
+    used = {normalize(item.category) for item in activity.items}
+    unused = [
+        category for category in activity.categories if normalize(category) not in used
+    ]
+    if unused:
+        problems.append(
+            f"categorize has no item for {', '.join(unused)}, so the category "
+            "is only a distractor"
+        )
+
+    if len({normalize(item.text) for item in activity.items}) != len(activity.items):
+        problems.append("categorize repeats an item")
+
+    return problems
+
+
+def check_option_explanations(
+    activity: GeneratedMultipleChoiceActivity,
+) -> list[str]:
+    if activity.option_explanations is None:
+        return []
+    if len(activity.option_explanations) != len(activity.options):
+        return [
+            "multipleChoice has "
+            f"{len(activity.option_explanations)} option explanations for "
+            f"{len(activity.options)} options. Write one for each, or none."
+        ]
+    return []
+
+
 def _grounded(answer: str, lesson_text: str) -> bool:
     normalized = normalize(answer)
     if len(normalized) < MIN_GROUNDED_LENGTH or not any(
@@ -180,9 +235,7 @@ def _grounded(answer: str, lesson_text: str) -> bool:
 
 
 def check_activity_grounding(
-    activity: GeneratedFillBlankActivity
-    | GeneratedMatchingActivity
-    | GeneratedMultipleChoiceActivity,
+    activity: GeneratedActivity,
     written_lesson_markdown: str,
 ) -> list[str]:
     """Every answer must come from the lesson, not from outside knowledge."""
@@ -195,6 +248,13 @@ def check_activity_grounding(
             if not _grounded(answer, lesson_text):
                 problems.append(
                     f'fillBlank blank {index} expects "{answer}", which the '
+                    "written lesson never mentions"
+                )
+    elif isinstance(activity, GeneratedCategorizeActivity):
+        for category in activity.categories:
+            if not _grounded(category, lesson_text):
+                problems.append(
+                    f'categorize uses the category "{category}", which the '
                     "written lesson never mentions"
                 )
     elif isinstance(activity, GeneratedMatchingActivity):

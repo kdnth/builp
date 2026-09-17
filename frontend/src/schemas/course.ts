@@ -44,6 +44,7 @@ const matchingActivitySchema = z.object({
   type: z.literal('matching'),
   id: z.string().min(1),
   description: z.string().nullish(),
+  explanation: z.string().nullish(),
   pairs: z.array(matchingPairSchema).min(1),
 })
 
@@ -56,6 +57,7 @@ const fillBlankActivitySchema = z.object({
   type: z.literal('fillBlank'),
   id: z.string().min(1),
   description: z.string().nullish(),
+  explanation: z.string().nullish(),
   text: z.string().min(1),
   blanks: z.array(blankSchema).min(1),
 })
@@ -64,15 +66,59 @@ const multipleChoiceActivitySchema = z.object({
   type: z.literal('multipleChoice'),
   id: z.string().min(1),
   description: z.string().nullish(),
+  explanation: z.string().nullish(),
+  passage: z.string().nullish(),
   question: z.string().min(1),
   options: z.array(z.string().min(1)).min(2),
+  optionExplanations: z.array(z.string()).nullish(),
   correctIndex: z.number().int().min(0),
+})
+
+const orderingActivitySchema = z.object({
+  type: z.literal('ordering'),
+  id: z.string().min(1),
+  description: z.string().nullish(),
+  explanation: z.string().nullish(),
+  basis: z.string().min(1),
+  items: z.array(z.string().min(1)).min(3).max(8),
+})
+
+const categorizeActivitySchema = z.object({
+  type: z.literal('categorize'),
+  id: z.string().min(1),
+  description: z.string().nullish(),
+  explanation: z.string().nullish(),
+  categories: z.array(z.string().min(1)).min(2).max(4),
+  items: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        text: z.string().min(1),
+        category: z.string().min(1),
+      }),
+    )
+    .min(3)
+    .max(8),
+})
+
+const numericActivitySchema = z.object({
+  type: z.literal('numeric'),
+  id: z.string().min(1),
+  description: z.string().nullish(),
+  explanation: z.string().nullish(),
+  question: z.string().min(1),
+  answer: z.number(),
+  tolerance: z.number().min(0).default(0),
+  unit: z.string().nullish(),
 })
 
 const interactiveActivitySchema = z.discriminatedUnion('type', [
   matchingActivitySchema,
   fillBlankActivitySchema,
   multipleChoiceActivitySchema,
+  orderingActivitySchema,
+  categorizeActivitySchema,
+  numericActivitySchema,
 ])
 
 const interactivePracticeSchema = z.object({

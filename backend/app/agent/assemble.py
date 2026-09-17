@@ -20,6 +20,9 @@ CourseActivity = (
     course_schema.MatchingActivity
     | course_schema.FillBlankActivity
     | course_schema.MultipleChoiceActivity
+    | course_schema.OrderingActivity
+    | course_schema.CategorizeActivity
+    | course_schema.NumericActivity
 )
 
 
@@ -29,6 +32,7 @@ def _assemble_activity(activity: gen.GeneratedActivity) -> CourseActivity:
             type="matching",
             id=_new_id(),
             description=activity.description,
+            explanation=activity.explanation,
             pairs=[
                 course_schema.MatchingPair(
                     id=_new_id(), term=pair.term, definition=pair.definition
@@ -41,18 +45,59 @@ def _assemble_activity(activity: gen.GeneratedActivity) -> CourseActivity:
             type="fillBlank",
             id=_new_id(),
             description=activity.description,
+            explanation=activity.explanation,
             text=activity.text,
             blanks=[
                 course_schema.Blank(position=index, accepted=blank.accepted)
                 for index, blank in enumerate(activity.blanks)
             ],
         )
+    if isinstance(activity, gen.GeneratedOrderingActivity):
+        return course_schema.OrderingActivity(
+            type="ordering",
+            id=_new_id(),
+            description=activity.description,
+            explanation=activity.explanation,
+            basis=activity.basis,
+            items=activity.items,
+        )
+
+    if isinstance(activity, gen.GeneratedCategorizeActivity):
+        return course_schema.CategorizeActivity(
+            type="categorize",
+            id=_new_id(),
+            description=activity.description,
+            explanation=activity.explanation,
+            categories=activity.categories,
+            items=[
+                course_schema.CategorizeItem(
+                    id=_new_id(), text=item.text, category=item.category
+                )
+                for item in activity.items
+            ],
+        )
+
+    if isinstance(activity, gen.GeneratedNumericActivity):
+        return course_schema.NumericActivity(
+            type="numeric",
+            id=_new_id(),
+            description=activity.description,
+            explanation=activity.explanation,
+            question=activity.question,
+            answer=activity.answer,
+            tolerance=activity.tolerance,
+            unit=activity.unit,
+        )
+
     return course_schema.MultipleChoiceActivity(
         type="multipleChoice",
         id=_new_id(),
         description=activity.description,
+        explanation=activity.explanation,
+        passage=activity.passage,
         question=activity.question,
         options=activity.options,
+        optionExplanations=activity.option_explanations,
         correctIndex=activity.correct_index,
     )
 

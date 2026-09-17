@@ -37,7 +37,7 @@ def _parse_json_encoded_value(value: object) -> object:
     return value
 
 
-MAX_LESSON_ACTIVITIES = 6
+MAX_LESSON_ACTIVITIES = 8
 
 # LLM schema: a JSON string. Python type: any JSON value.
 JsonEncodedValue = Annotated[
@@ -163,7 +163,14 @@ class LessonSummary(BaseModel):
         "not 'none'."
     )
     interactive_activity_types: list[
-        Literal["matching", "fillBlank", "multipleChoice"]
+        Literal[
+            "matching",
+            "fillBlank",
+            "multipleChoice",
+            "ordering",
+            "categorize",
+            "numeric",
+        ]
     ] = Field(
         description="Which interactive activity types this lesson should "
         "include, in the order they should appear. Can be empty."
@@ -209,9 +216,17 @@ class GeneratedMatchingPair(BaseModel):
     definition: str
 
 
+EXPLANATION_FIELD = Field(
+    default=None,
+    description="One or two sentences telling the learner why the answer is "
+    "right, shown after they answer.",
+)
+
+
 class GeneratedMatchingActivity(BaseModel):
     type: Literal["matching"] = "matching"
     description: str | None = None
+    explanation: str | None = EXPLANATION_FIELD
     pairs: list[GeneratedMatchingPair] = Field(min_length=3)
 
 
@@ -225,6 +240,7 @@ class GeneratedBlank(BaseModel):
 class GeneratedFillBlankActivity(BaseModel):
     type: Literal["fillBlank"] = "fillBlank"
     description: str | None = None
+    explanation: str | None = EXPLANATION_FIELD
     text: str = Field(
         description="The passage with each blank written as {{blank}}, in "
         "order. The number of {{blank}} tokens must equal the number of "
@@ -236,17 +252,84 @@ class GeneratedFillBlankActivity(BaseModel):
 class GeneratedMultipleChoiceActivity(BaseModel):
     type: Literal["multipleChoice"] = "multipleChoice"
     description: str | None = None
+    explanation: str | None = EXPLANATION_FIELD
+    passage: str | None = Field(
+        default=None,
+        description="A short case, quote, or data table in markdown, shown "
+        "above the question. Use it when the question needs material to "
+        "reason about.",
+    )
     question: str
     options: list[str] = Field(min_length=2, max_length=6)
+    option_explanations: list[str] | None = Field(
+        default=None,
+        description="Why each option is right or wrong, in the same order as "
+        "`options`. Give one for every option, or none at all.",
+    )
     correct_index: int = Field(
         description="Index into `options` of the correct answer."
+    )
+
+
+class GeneratedOrderingActivity(BaseModel):
+    type: Literal["ordering"] = "ordering"
+    description: str | None = None
+    explanation: str | None = EXPLANATION_FIELD
+    basis: str = Field(
+        description="What decides the order, e.g. 'chronological', 'process "
+        "steps', 'smallest to largest'. The lesson must make it clear."
+    )
+    items: list[str] = Field(
+        min_length=3,
+        max_length=8,
+        description="The items in the one correct order. The learner sees "
+        "them shuffled.",
+    )
+
+
+class GeneratedCategorizeItem(BaseModel):
+    text: str
+    category: str = Field(description="Must be one of the activity's categories.")
+
+
+class GeneratedCategorizeActivity(BaseModel):
+    type: Literal["categorize"] = "categorize"
+    description: str | None = None
+    explanation: str | None = EXPLANATION_FIELD
+    categories: list[str] = Field(min_length=2, max_length=4)
+    items: list[GeneratedCategorizeItem] = Field(min_length=3, max_length=8)
+
+
+class GeneratedNumericActivity(BaseModel):
+    type: Literal["numeric"] = "numeric"
+    description: str | None = None
+    explanation: str | None = EXPLANATION_FIELD
+    question: str
+    answer: float = Field(description="The correct number.")
+    answer_expression: str = Field(
+        description="A Python expression that computes `answer` from the "
+        "numbers in the question, e.g. '(120 - 100) / 100 * 100'. The server "
+        "runs it to check your answer. Use only arithmetic and the math "
+        "module."
+    )
+    tolerance: float = Field(
+        default=0,
+        ge=0,
+        description="How far from `answer` still counts as correct. Use it "
+        "for rounded answers, e.g. 0.01.",
+    )
+    unit: str | None = Field(
+        default=None, description="The unit of the answer, e.g. 'percent'."
     )
 
 
 GeneratedActivity = Annotated[
     GeneratedMatchingActivity
     | GeneratedFillBlankActivity
-    | GeneratedMultipleChoiceActivity,
+    | GeneratedMultipleChoiceActivity
+    | GeneratedOrderingActivity
+    | GeneratedCategorizeActivity
+    | GeneratedNumericActivity,
     Field(discriminator="type"),
 ]
 
@@ -256,9 +339,10 @@ class GeneratedSection(BaseModel):
     markdown: str = Field(description="This part of the lesson, in markdown.")
     activities: list[GeneratedActivity] = Field(
         default_factory=list,
-        max_length=3,
+        max_length=MAX_LESSON_ACTIVITIES,
         description="Checks the learner does right after reading this "
-        "section. They test this section only. Can be empty.",
+        "section. They test this section only. Can be empty. Keep mid-lesson "
+        "checks to 1 or 2; a final review section can hold more.",
     )
 
 
