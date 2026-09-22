@@ -11,6 +11,7 @@ import logging
 
 from sqlalchemy.orm import Session
 
+from app.agent.budget import TokenBudget, job_token_budget
 from app.agent.graph import run_generation
 from app.agent.llm import (
     CallUsage,
@@ -67,6 +68,7 @@ def _screen(
     job: GenerationJob,
     model_config: GenerationModelConfig,
     metrics: DatabaseMetricsReporter,
+    budget: TokenBudget,
 ) -> ScreeningDecision:
     calls: list[CallUsage] = []
     try:
@@ -77,6 +79,7 @@ def _screen(
             notes=job.notes,
             model_config=model_config,
             calls=calls,
+            budget=budget,
         )
     finally:
         metrics.record_stage(
@@ -101,8 +104,9 @@ def run_generation_job(
         db.commit()
 
         metrics_reporter = DatabaseMetricsReporter(job.id, SessionLocal)
+        budget = TokenBudget(job_token_budget(job.num_units, job.lessons_per_unit))
         try:
-            decision = _screen(job, active_model_config, metrics_reporter)
+            decision = _screen(job, active_model_config, metrics_reporter, budget)
         except Exception as exc:
             _fail(db, job, exc, active_model_config)
             return
@@ -133,6 +137,7 @@ def run_generation_job(
                 model_config=active_model_config,
                 progress=DatabaseProgressReporter(job.id, SessionLocal),
                 metrics=metrics_reporter,
+                budget=budget,
             )
         except Exception as exc:
             _fail(db, job, exc, active_model_config)

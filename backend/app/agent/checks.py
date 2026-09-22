@@ -13,6 +13,7 @@ import re
 import subprocess
 import sys
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 
 from app.agent.activity_checks import (
@@ -339,18 +340,33 @@ def check_multiple_choice_consistency(
     return None
 
 
-def check_lesson_content(
-    content: LessonContent, *, language: CodePracticePolicy
-) -> list[str]:
-    """Every deterministic check applicable to a generated lesson.
+@dataclass(frozen=True)
+class LessonCheckResult:
+    """The two kinds of problem a lesson check can find, kept apart so a
+    retry caused only by an activity problem can ask for new activities
+    alone instead of paying to rewrite the whole lesson - see
+    generate_lesson_content in nodes.py."""
 
-    Returns a list of problems, empty if everything checks out.
-    """
-    problems: list[str] = []
+    structural: list[str]
+    activity: list[str]
+
+    @property
+    def combined(self) -> list[str]:
+        return self.structural + self.activity
+
+
+def check_lesson_content_split(
+    content: LessonContent, *, language: CodePracticePolicy
+) -> LessonCheckResult:
+    """Every deterministic check applicable to a generated lesson, split
+    by whether fixing it needs the written content and code practice
+    rewritten (structural) or only the activities (activity)."""
+    structural: list[str] = []
+    activity: list[str] = []
 
     if content.code_practice is not None:
         if language == "none":
-            problems.append(
+            structural.append(
                 "this lesson has a code practice, but this lesson was asked "
                 "not to have one"
             )
@@ -359,30 +375,38 @@ def check_lesson_content(
                 content.code_practice, language=language
             )
             if problem:
-                problems.append(problem)
+                structural.append(problem)
 
-    for activity in content.interactive_activities:
-        if activity.type == "fillBlank":
-            problem = check_fill_blank_consistency(activity)
-            problems.extend(check_fill_blank_answerability(activity))
-        elif activity.type == "multipleChoice":
-            problem = check_multiple_choice_consistency(activity)
-            problems.extend(check_multiple_choice_quality(activity))
-            problems.extend(check_option_explanations(activity))
-        elif activity.type == "ordering":
+    for act in content.interactive_activities:
+        if act.type == "fillBlank":
+            problem = check_fill_blank_consistency(act)
+            activity.extend(check_fill_blank_answerability(act))
+        elif act.type == "multipleChoice":
+            problem = check_multiple_choice_consistency(act)
+            activity.extend(check_multiple_choice_quality(act))
+            activity.extend(check_option_explanations(act))
+        elif act.type == "ordering":
             problem = None
-            problems.extend(check_ordering_answerability(activity))
-        elif activity.type == "categorize":
+            activity.extend(check_ordering_answerability(act))
+        elif act.type == "categorize":
             problem = None
-            problems.extend(check_categorize_answerability(activity))
-        elif activity.type == "numeric":
-            problem = check_numeric_consistency(activity)
+            activity.extend(check_categorize_answerability(act))
+        elif act.type == "numeric":
+            problem = check_numeric_consistency(act)
         else:
             problem = None
         if problem:
-            problems.append(problem)
-        problems.extend(
-            check_activity_grounding(activity, content.written_lesson_markdown)
-        )
+            activity.append(problem)
+        activity.extend(check_activity_grounding(act, content.written_lesson_markdown))
 
-    return problems
+    return LessonCheckResult(structural=structural, activity=activity)
+
+
+def check_lesson_content(
+    content: LessonContent, *, language: CodePracticePolicy
+) -> list[str]:
+    """Every deterministic check applicable to a generated lesson.
+
+    Returns a list of problems, empty if everything checks out.
+    """
+    return check_lesson_content_split(content, language=language).combined

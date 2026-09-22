@@ -1,6 +1,7 @@
 from app.agent.prompts import (
     lesson_content_evaluate_prompt,
     lesson_content_generate_prompt,
+    overview_evaluate_prompt,
     overview_generate_prompt,
     render_course_map,
     unit_outline_generate_prompt,
@@ -67,6 +68,15 @@ def test_overview_prompt_lets_the_model_choose_for_a_general_course():
 def test_overview_prompt_can_forbid_code_practice():
     text = _overview_text(course_type="general", language="none")
     assert "set code_practice_policy to 'none'" in text
+
+
+def test_overview_evaluate_prompt_tells_the_judge_the_unit_count_was_fixed():
+    from app.agent.prompts import OVERVIEW_EVAL_SYSTEM
+
+    text = _text(overview_evaluate_prompt(_OVERVIEW, num_units=1))
+    assert "required to have exactly 1 unit(s)" in text
+    assert "out of the writer's control" in OVERVIEW_EVAL_SYSTEM
+    assert "Never fail an overview" in OVERVIEW_EVAL_SYSTEM
 
 
 def test_unit_outline_prompt_names_the_allowed_profiles():

@@ -28,6 +28,9 @@ logger = logging.getLogger(__name__)
 StageName = Literal["screening", "overview", "unit_outline", "lesson_content"]
 
 
+FEEDBACK_LIMIT = 500
+
+
 @dataclass
 class StageMetrics:
     stage: StageName
@@ -35,6 +38,8 @@ class StageMetrics:
     attempts: int
     detail: list[dict[str, object]] = field(default_factory=list)
     calls: list[CallUsage] = field(default_factory=list)
+    profile: str | None = None
+    generate_errors: list[str] = field(default_factory=list)
 
     def totals(self) -> dict[str, int]:
         return {
@@ -47,7 +52,9 @@ class StageMetrics:
         }
 
 
-def stage_metrics(stage: StageName, outcome: StageOutcome) -> StageMetrics:
+def stage_metrics(
+    stage: StageName, outcome: StageOutcome, *, profile: str | None = None
+) -> StageMetrics:
     detail = [
         {
             "attempt": attempt.attempt,
@@ -55,6 +62,11 @@ def stage_metrics(stage: StageName, outcome: StageOutcome) -> StageMetrics:
             "problems": attempt.problems,
             "score": attempt.evaluation.score if attempt.evaluation else None,
             "passed": bool(attempt.evaluation and attempt.evaluation.passed),
+            "feedback": (
+                attempt.evaluation.feedback[:FEEDBACK_LIMIT]
+                if attempt.evaluation
+                else None
+            ),
         }
         for attempt in outcome.attempts
     ]
@@ -64,6 +76,8 @@ def stage_metrics(stage: StageName, outcome: StageOutcome) -> StageMetrics:
         attempts=outcome.attempt_count,
         detail=detail,
         calls=outcome.calls,
+        profile=profile,
+        generate_errors=outcome.generate_errors,
     )
 
 
@@ -95,6 +109,8 @@ class DatabaseMetricsReporter:
                         detail={
                             "attempts": metrics.detail,
                             "calls": [call.as_dict() for call in metrics.calls],
+                            "profile": metrics.profile,
+                            "generate_errors": metrics.generate_errors,
                         },
                         **totals,
                     )
@@ -121,12 +137,13 @@ def summarize_job_metrics(db: Session, job_id: str) -> dict[str, object]:
 
     for row in rows:
         stage = stages.setdefault(
-            row.stage, {"runs": 0, "attempts": 0, "not_passed": 0}
+            row.stage, {"runs": 0, "attempts": 0, "not_passed": 0, "generate_errors": 0}
         )
         stage["runs"] += 1
         stage["attempts"] += row.attempts
         if not row.passed:
             stage["not_passed"] += 1
+        stage["generate_errors"] += len((row.detail or {}).get("generate_errors", []))
 
         for call in (row.detail or {}).get("calls", []):
             purpose = str(call.get("purpose", "unknown"))

@@ -195,6 +195,32 @@ def test_generate_exception_is_retried_with_feedback():
     assert outcome.passed is True
     assert calls[0] is None
     assert "stringified object" in calls[1]
+    assert len(outcome.generate_errors) == 1
+    assert "stringified object" in outcome.generate_errors[0]
+
+
+def test_generate_errors_accumulate_across_every_raised_attempt():
+    calls = 0
+
+    def generate(tier, feedback):
+        nonlocal calls
+        calls += 1
+        if calls in (1, 2):
+            raise ValueError(f"broken on attempt {calls}")
+        return "content"
+
+    outcome = run_stage_with_retries(
+        generate=generate,
+        check=lambda content: [],
+        evaluate=lambda content: _eval(True),
+        default_tier="fast",
+        max_attempts=3,
+    )
+
+    assert outcome.passed is True
+    assert len(outcome.generate_errors) == 2
+    assert "attempt 1" in outcome.generate_errors[0]
+    assert "attempt 2" in outcome.generate_errors[1]
 
 
 def test_generate_exception_on_every_attempt_reraises():
@@ -255,4 +281,77 @@ def test_generate_exception_does_not_escalate_tier_early():
         )
 
     # still escalates on the final attempt, same as any other failure
+    assert tiers_used == ["fast", "fast", "strong"]
+
+
+def test_pure_check_failures_do_not_escalate_the_final_attempt():
+    """A count/shape mismatch is a structural miss, not a quality
+    ceiling - a stronger model has no particular advantage at counting
+    correctly, so paying `strong` prices for it is wasted spend."""
+    tiers_used = []
+
+    def generate(tier, feedback):
+        tiers_used.append(tier)
+        return "content"
+
+    outcome = run_stage_with_retries(
+        generate=generate,
+        check=lambda content: ["wrong count"],
+        evaluate=lambda content: _eval(True),
+        default_tier="fast",
+        max_attempts=3,
+    )
+
+    assert outcome.passed is False
+    assert tiers_used == ["fast", "fast", "fast"]
+
+
+def test_escalates_once_a_check_failure_is_followed_by_a_quality_failure():
+    """Mixed history: the first attempt missed the count, but a later one
+    got the shape right and only fell short on the judge's rubric. That's
+    a real quality ceiling, so escalation on the final attempt is still
+    warranted."""
+    tiers_used = []
+    attempt = {"n": 0}
+
+    def generate(tier, feedback):
+        tiers_used.append(tier)
+        attempt["n"] += 1
+        return f"content-{attempt['n']}"
+
+    def check(content):
+        return ["wrong count"] if content == "content-1" else []
+
+    run_stage_with_retries(
+        generate=generate,
+        check=check,
+        evaluate=lambda content: _eval(False, feedback="still not good enough"),
+        default_tier="fast",
+        max_attempts=3,
+    )
+
+    assert tiers_used == ["fast", "fast", "strong"]
+
+
+def test_generate_exceptions_still_escalate_even_with_no_check_failures():
+    """An unparseable response isn't a structural-content miss the way a
+    wrong count is - it's plausibly a capability issue, so it keeps the
+    normal escalation behavior."""
+    tiers_used = []
+
+    def generate(tier, feedback):
+        tiers_used.append(tier)
+        if tier != "strong":
+            raise ValueError("could not parse")
+        return "content"
+
+    outcome = run_stage_with_retries(
+        generate=generate,
+        check=lambda content: [],
+        evaluate=lambda content: _eval(True),
+        default_tier="fast",
+        max_attempts=3,
+    )
+
+    assert outcome.passed is True
     assert tiers_used == ["fast", "fast", "strong"]

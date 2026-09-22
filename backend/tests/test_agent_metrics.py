@@ -245,8 +245,13 @@ def test_summarize_job_metrics_aggregates_stages_and_tokens(db_session):
     summary = summarize_job_metrics(db_session, "job-1")
 
     assert summary["stages"] == {
-        "overview": {"runs": 1, "attempts": 1, "not_passed": 0},
-        "lesson_content": {"runs": 1, "attempts": 3, "not_passed": 1},
+        "overview": {"runs": 1, "attempts": 1, "not_passed": 0, "generate_errors": 0},
+        "lesson_content": {
+            "runs": 1,
+            "attempts": 3,
+            "not_passed": 1,
+            "generate_errors": 0,
+        },
     }
     assert summary["calls"] == {"generate": 2, "evaluate": 1}
     assert summary["tokens"]["input_tokens"] == 12
@@ -306,5 +311,6 @@ def test_run_generation_job_stores_a_metrics_summary(db_session):
         "runs": 1,
         "attempts": 1,
         "not_passed": 0,
+        "generate_errors": 0,
     }
     assert job.metrics["tokens"]["input_tokens"] == 9

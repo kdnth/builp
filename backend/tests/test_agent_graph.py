@@ -105,7 +105,6 @@ def test_graph_result_validates_against_the_real_course_schema():
 
 def test_graph_handles_uneven_lesson_counts_per_unit():
     def variable_unit_outline(*, overview, unit, lessons_per_unit, **kwargs):
-        # unit N gets N lessons, not a fixed count
         count = int(unit.title.split()[-1])
         outline = UnitOutline(
             lessons=[
@@ -119,7 +118,7 @@ def test_graph_handles_uneven_lesson_counts_per_unit():
         topic="testing",
         audience="beginners",
         num_units=3,
-        lessons_per_unit=1,
+        lessons_per_unit=3,
         graph=_graph(unit_outline_fn=variable_unit_outline),
     )
 
@@ -236,3 +235,57 @@ def test_code_practice_language_comes_from_the_brief():
     pages = course.units[0].lessons[0].pages
     code = next(page for page in pages if page.kind == "code")
     assert code.practice.language == "python"
+
+
+def test_overview_units_are_clamped_to_the_requested_count():
+    """The exact incident this guards against: an overview that ignores
+    "exactly 1 unit" and returns more anyway must not fan out more than
+    what was requested, no matter how many units it wrote."""
+
+    def overgenerating_overview(*, num_units, **kwargs):
+        overview = make_overview(num_units=6)
+        return StageOutcome(content=overview, passed=False, attempts=[])
+
+    course = run_generation(
+        topic="testing",
+        audience="beginners",
+        num_units=1,
+        lessons_per_unit=1,
+        graph=_graph(overview_fn=overgenerating_overview),
+    )
+
+    assert len(course.units) == 1
+
+
+def test_outline_lessons_are_clamped_to_the_requested_count():
+    def overgenerating_outline(*, lessons_per_unit, **kwargs):
+        outline = UnitOutline(
+            lessons=[make_lesson_summary(title=f"L{i}") for i in range(5)]
+        )
+        return StageOutcome(content=outline, passed=False, attempts=[])
+
+    course = run_generation(
+        topic="testing",
+        audience="beginners",
+        num_units=1,
+        lessons_per_unit=2,
+        graph=_graph(unit_outline_fn=overgenerating_outline),
+    )
+
+    assert len(course.units[0].lessons) == 2
+
+
+def test_a_compliant_outline_is_never_padded_up_to_the_request():
+    def undergenerating_outline(*, lessons_per_unit, **kwargs):
+        outline = UnitOutline(lessons=[make_lesson_summary(title="Only one")])
+        return StageOutcome(content=outline, passed=False, attempts=[])
+
+    course = run_generation(
+        topic="testing",
+        audience="beginners",
+        num_units=1,
+        lessons_per_unit=3,
+        graph=_graph(unit_outline_fn=undergenerating_outline),
+    )
+
+    assert len(course.units[0].lessons) == 1

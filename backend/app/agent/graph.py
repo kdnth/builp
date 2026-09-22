@@ -25,6 +25,7 @@ from langgraph.types import Command, Send
 from app.agent import nodes as default_nodes
 from app.agent import prompts
 from app.agent.assemble import assemble_course, assemble_lesson
+from app.agent.budget import TokenBudget, job_token_budget
 from app.agent.llm import GenerationModelConfig, default_free_credit_model_config
 from app.agent.metrics import (
     MetricsReporter,
@@ -80,6 +81,7 @@ class GenerationState(TypedDict):
     model_config: GenerationModelConfig
     progress: ProgressReporter
     metrics: MetricsReporter
+    budget: TokenBudget
     overview: CourseOverview
     overview_passed: bool
     unit_outlines: Annotated[list[UnitOutlineRecord], operator.add]
@@ -108,10 +110,15 @@ def build_graph(
             learning_goals=state["learning_goals"],
             notes=state["notes"],
             model_config=state["model_config"],
+            budget=state["budget"],
         )
-        overview = outcome.content
         state["metrics"].record_stage(stage_metrics("overview", outcome))
         state["progress"].stage("units")
+        overview = outcome.content
+        if len(overview.units) > state["num_units"]:
+            overview = overview.model_copy(
+                update={"units": overview.units[: state["num_units"]]}
+            )
         return Command(
             update={"overview": overview, "overview_passed": outcome.passed},
             goto=[
@@ -125,6 +132,7 @@ def build_graph(
                         "model_config": state["model_config"],
                         "progress": state["progress"],
                         "metrics": state["metrics"],
+                        "budget": state["budget"],
                     },
                 )
                 for index, unit in enumerate(overview.units)
@@ -137,12 +145,19 @@ def build_graph(
             unit=payload["unit"],
             lessons_per_unit=payload["lessons_per_unit"],
             model_config=payload["model_config"],
+            budget=payload["budget"],
         )
         payload["metrics"].record_stage(stage_metrics("unit_outline", outcome))
+        outline = outcome.content
+        lessons_per_unit = payload["lessons_per_unit"]
+        if len(outline.lessons) > lessons_per_unit:
+            outline = outline.model_copy(
+                update={"lessons": outline.lessons[:lessons_per_unit]}
+            )
         record: UnitOutlineRecord = {
             "unit_index": payload["unit_index"],
             "unit": payload["unit"],
-            "outline": outcome.content,
+            "outline": outline,
             "passed": outcome.passed,
         }
         return {"unit_outlines": [record]}
@@ -178,6 +193,7 @@ def build_graph(
                         "model_config": state["model_config"],
                         "progress": progress,
                         "metrics": state["metrics"],
+                        "budget": state["budget"],
                     },
                 )
                 for record in records
@@ -196,8 +212,11 @@ def build_graph(
             course_map=payload["course_map"],
             reading_style=payload["reading_style"],
             model_config=payload["model_config"],
+            budget=payload["budget"],
         )
-        payload["metrics"].record_stage(stage_metrics("lesson_content", outcome))
+        payload["metrics"].record_stage(
+            stage_metrics("lesson_content", outcome, profile=lesson_summary.profile)
+        )
         policy = payload["overview"].brief.code_practice_policy
         code_language: CodeLanguage = policy if policy != "none" else "javascript"
         lesson = assemble_lesson(lesson_summary.title, outcome.content, code_language)
@@ -257,6 +276,7 @@ def run_generation(
     model_config: GenerationModelConfig | None = None,
     progress: ProgressReporter | None = None,
     metrics: MetricsReporter | None = None,
+    budget: TokenBudget | None = None,
     graph: CompiledStateGraph | None = None,
 ) -> Course:
     compiled = graph or build_graph()
@@ -275,6 +295,8 @@ def run_generation(
             "model_config": model_config or default_free_credit_model_config(),
             "progress": progress or NoopProgressReporter(),
             "metrics": metrics or NoopMetricsReporter(),
+            "budget": budget
+            or TokenBudget(job_token_budget(num_units, lessons_per_unit)),
             "unit_outlines": [],
             "lesson_records": [],
         }

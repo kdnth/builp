@@ -6,6 +6,7 @@ one person professional advice.
 """
 
 from app.agent import prompts
+from app.agent.budget import TokenBudget
 from app.agent.llm import CallUsage, GenerationModelConfig, invoke_structured
 from app.agent.schemas import ScreeningDecision
 
@@ -18,6 +19,7 @@ def screen_topic(
     notes: str | None,
     model_config: GenerationModelConfig,
     calls: list[CallUsage],
+    budget: TokenBudget | None = None,
 ) -> ScreeningDecision:
     return invoke_structured(
         schema=ScreeningDecision,
@@ -31,4 +33,5 @@ def screen_topic(
         model_config=model_config,
         purpose="screen",
         calls=calls,
+        budget=budget,
     )

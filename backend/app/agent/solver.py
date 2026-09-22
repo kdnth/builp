@@ -14,6 +14,7 @@ accepts "0" through "9" agrees with whatever the model picks.
 
 from app.agent import prompts
 from app.agent.activity_checks import normalize, variant_groups
+from app.agent.budget import TokenBudget
 from app.agent.llm import CallUsage, GenerationModelConfig, invoke_structured
 from app.agent.schemas import (
     ActivitySolutions,
@@ -136,6 +137,7 @@ def solve_activities(
     content: LessonContent,
     model_config: GenerationModelConfig,
     calls: list[CallUsage],
+    budget: TokenBudget | None = None,
 ) -> list[str]:
     """Problems found by answering the activities without the key. An empty
     list means the solver agreed and saw no second answer."""
@@ -153,6 +155,7 @@ def solve_activities(
         model_config=model_config,
         purpose="solve",
         calls=calls,
+        budget=budget,
     )
 
     by_number = dict(activities)

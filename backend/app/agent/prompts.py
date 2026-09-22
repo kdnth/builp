@@ -246,14 +246,32 @@ generated course overview against five criteria:
 5. Brief quality: is the glossary correct and free of invented terms, and \
    are the misconceptions ones learners really hold?
 
+The number of units was fixed by whoever requested this course, before \
+the model that wrote this overview ever saw the topic, and a separate, \
+non-negotiable check already rejects any overview that doesn't use \
+exactly that many units. Never fail an overview, or suggest a different \
+unit count, on the grounds that it has too many or too few units - that \
+count is out of the writer's control. Judge scope and progression only \
+within that fixed count: whether each unit makes good use of the space it \
+has, and whether a topic that is broad for the given number of units is \
+still handled as well as that constraint allows (for example, prioritizing \
+the most important sub-topics over shallow, uniform coverage of all of \
+them).
+
 Score 1-5. Pass only if the overview is genuinely usable as-is; a 3 should \
 still fail. Be specific in feedback: name the unit and the exact problem."""
 
 
-def overview_evaluate_prompt(overview: CourseOverview) -> list[BaseMessage]:
+def overview_evaluate_prompt(
+    overview: CourseOverview, *, num_units: int
+) -> list[BaseMessage]:
+    human = (
+        f"This course was required to have exactly {num_units} unit(s).\n\n"
+        + render_overview(overview)
+    )
     return [
         SystemMessage(content=OVERVIEW_EVAL_SYSTEM),
-        HumanMessage(content=render_overview(overview)),
+        HumanMessage(content=human),
     ]
 
 
@@ -492,6 +510,68 @@ def lesson_content_generate_prompt(
         f'Write the content for this lesson: "{lesson.title}" - {lesson.goal}\n'
         + " ".join(extras)
         + _feedback_block(feedback)
+    )
+    return [system, HumanMessage(content=human)]
+
+
+def lesson_activities_fix_prompt(
+    *,
+    overview: CourseOverview,
+    unit: UnitSummary,
+    outline: UnitOutline,
+    lesson_index: int,
+    course_map: str,
+    reading_style: ReadingStyle,
+    draft: LessonContent,
+    feedback: str,
+    provider: SupportedProvider,
+) -> list[BaseMessage]:
+    """Ask for new activities only, for a lesson whose written content and
+    code practice already passed. Reuses the exact system prompt the full
+    lesson call uses (same profile, code rules, brief, course map), so this
+    retry can still land in that call's prompt cache instead of paying for
+    a second copy of the same prefix.
+    """
+    lesson = outline.lessons[lesson_index]
+    code_language: CodePracticePolicy = (
+        overview.brief.code_practice_policy if lesson.include_code_practice else "none"
+    )
+    system_prompt = lesson_content_system(
+        profile=lesson.profile,
+        code_language=code_language,
+        reading_style=reading_style,
+    )
+    context = (
+        f"{system_prompt}"
+        f"\n\nCourse audience: {overview.audience}\n\n"
+        f"{render_brief(overview.brief)}\n\n{course_map}"
+    )
+    system = cached_system_message(context, provider=provider)
+
+    sections_text = "\n\n".join(
+        f"Section {index}: {section.title}\n{section.markdown}"
+        for index, section in enumerate(draft.sections)
+    )
+    extras = []
+    if lesson.interactive_activity_types:
+        extras.append(
+            "Include these interactive activity types, in this order: "
+            + ", ".join(lesson.interactive_activity_types)
+        )
+
+    human = (
+        "This lesson's written content and code practice are already "
+        "finished and correct - do not change them. Fix only the "
+        "activities that need it, for the section(s) named in the "
+        "feedback below.\n\n"
+        f"{sections_text}\n\n"
+        "For each section whose activities need to change, write one "
+        "entry with its section_index, matching the numbers above, and "
+        "that section's full new activities list. Do not write an entry "
+        "for a section that needs no change.\n"
+        + " ".join(extras)
+        + "\n\nWhat was wrong with the last set of activities - fix this:\n"
+        + feedback
     )
     return [system, HumanMessage(content=human)]
 

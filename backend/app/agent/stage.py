@@ -15,6 +15,7 @@ model call or an API key.
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
+from app.agent.budget import TokenBudgetExceeded
 from app.agent.llm import CallUsage, ModelTier, tier_for_attempt
 from app.agent.schemas import EvaluationResult
 
@@ -34,6 +35,7 @@ class StageOutcome[T]:
     passed: bool
     attempts: list[StageAttempt[T]] = field(default_factory=list)
     calls: list[CallUsage] = field(default_factory=list)
+    generate_errors: list[str] = field(default_factory=list)
 
     @property
     def attempt_count(self) -> int:
@@ -63,12 +65,19 @@ def run_stage_with_retries[T](
     `evaluate` only runs once `check` passes, and is the LLM-as-judge call
     for the stage's qualitative rubric.
 
-    The last attempt (`max_attempts`) always uses the `strong` tier,
-    regardless of `default_tier` (see `tier_for_attempt`), as a quality
-    backstop. The loop always returns something: even if the final attempt
-    still fails, its content is returned with `passed=False` so the caller
-    can decide how to handle a stage that never cleared the bar (used as
-    written, flagged for human review, etc.) rather than crashing the job.
+    The last attempt escalates to the `strong` tier as a quality
+    backstop (see `tier_for_attempt`) - unless every attempt so far
+    failed for the same reason: the deterministic `check` found a
+    structural problem (wrong count, wrong shape), with `generate`
+    producing valid output every time. That specific pattern is not a
+    quality ceiling a stronger model would help with, so escalation is
+    withheld only there. A `generate` exception (unparseable output) can
+    still escalate, since a stronger model plausibly does better at
+    following the schema at all. The loop always returns something: even
+    if the final attempt still fails, its content is returned with
+    `passed=False` so the caller can decide how to handle a stage that
+    never cleared the bar (used as written, flagged for human review,
+    etc.) rather than crashing the job.
 
     `generate` and `evaluate` are both LLM calls, and both can raise: a
     model occasionally returns a nested object JSON-encoded as a string
@@ -79,19 +88,41 @@ def run_stage_with_retries[T](
     an exception here is treated the same as a failed check: it becomes
     feedback for the next attempt. Only if every attempt raises, including
     the final strong-tier one, does the exception actually propagate.
+
+    An `evaluate` exception still becomes a `StageAttempt` (there is valid
+    content to attach it to). A `generate` exception cannot: there is no
+    content for that attempt, so it is recorded in `StageOutcome.generate_errors`
+    instead. Check there, not just `attempts`, when auditing why a stage
+    needed all its retries - a golden-set report or metrics view that only
+    reads `attempts` will undercount failures.
+
+    `TokenBudgetExceeded` is not one of those exceptions: it means the job
+    already spent its whole allowance, so it always propagates immediately
+    instead of being retried into more spend.
     """
     attempts: list[StageAttempt[T]] = []
+    generate_errors: list[str] = []
     feedback: str | None = None
     last_error: Exception | None = None
+    only_structural_failures_so_far = True
 
     for attempt_number in range(1, max_attempts + 1):
-        tier = tier_for_attempt(default_tier, attempt_number, max_attempts)
+        tier = tier_for_attempt(
+            default_tier,
+            attempt_number,
+            max_attempts,
+            escalate=not only_structural_failures_so_far,
+        )
 
         try:
             content = generate(tier, feedback)
+        except TokenBudgetExceeded:
+            raise
         except Exception as exc:  # noqa: BLE001 - see docstring
             last_error = exc
             feedback = f"Your last response could not be read: {exc}"
+            generate_errors.append(f"attempt {attempt_number} ({tier}): {exc}")
+            only_structural_failures_so_far = False
             continue
 
         problems = check(content)
@@ -109,8 +140,12 @@ def run_stage_with_retries[T](
             )
             continue
 
+        only_structural_failures_so_far = False
+
         try:
             evaluation = evaluate(content)
+        except TokenBudgetExceeded:
+            raise
         except Exception as exc:  # noqa: BLE001 - see docstring
             last_error = exc
             feedback = f"Your last response could not be read: {exc}"
@@ -137,7 +172,11 @@ def run_stage_with_retries[T](
 
         if evaluation.passed:
             return StageOutcome(
-                content=content, passed=True, attempts=attempts, calls=calls or []
+                content=content,
+                passed=True,
+                attempts=attempts,
+                calls=calls or [],
+                generate_errors=generate_errors,
             )
 
         feedback = evaluation.feedback
@@ -148,6 +187,7 @@ def run_stage_with_retries[T](
             passed=False,
             attempts=attempts,
             calls=calls or [],
+            generate_errors=generate_errors,
         )
 
     assert last_error is not None  # every loop iteration sets one or the other

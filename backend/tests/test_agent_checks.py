@@ -2,6 +2,7 @@ from app.agent.checks import (
     check_fill_blank_consistency,
     check_function_practice_consistency,
     check_lesson_content,
+    check_lesson_content_split,
     check_multiple_choice_consistency,
     check_outline_lesson_count,
     check_overview_unit_count,
@@ -214,6 +215,36 @@ def test_check_lesson_content_aggregates_all_problems():
     )
     problems = check_lesson_content(content, language="javascript")
     assert len(problems) == 2
+
+
+def test_check_lesson_content_split_buckets_code_practice_as_structural():
+    content = make_lesson_content(
+        markdown="# hi",
+        code_practice=_practice(
+            "function add(a, b) { return a + b }", [([1, 2], 999), ([5, 5], 10)]
+        ),
+        activities=[],
+    )
+    result = check_lesson_content_split(content, language="javascript")
+    assert len(result.structural) == 1
+    assert result.activity == []
+    assert result.combined == result.structural
+
+
+def test_check_lesson_content_split_buckets_activity_problems_as_activity():
+    content = make_lesson_content(
+        markdown="# hi",
+        code_practice=None,
+        activities=[
+            GeneratedMultipleChoiceActivity(
+                question="2 + 2?", options=["3", "4"], correct_index=5
+            ),
+        ],
+    )
+    result = check_lesson_content_split(content, language="javascript")
+    assert result.structural == []
+    assert len(result.activity) == 1
+    assert result.combined == result.activity
 
 
 def test_check_lesson_content_empty_when_clean():

@@ -379,6 +379,27 @@ class LessonContent(BaseModel):
         return self
 
 
+class GeneratedSectionActivities(BaseModel):
+    """New activities for one section of an already-written lesson - the
+    output of the narrower retry that fixes only the activities instead
+    of rewriting the whole lesson. See lesson_activities_fix_prompt."""
+
+    section_index: int = Field(
+        description="The 0-based index of the section these activities "
+        "replace, matching the numbered sections in the prompt."
+    )
+    activities: list[GeneratedActivity] = Field(
+        default_factory=list, max_length=MAX_LESSON_ACTIVITIES
+    )
+
+
+class GeneratedLessonActivityFix(BaseModel):
+    sections: list[GeneratedSectionActivities] = Field(
+        description="One entry for each section whose activities need to "
+        "change. Do not include a section that needs no change."
+    )
+
+
 # --- Evaluation (shared shape across all three stages) ------------------
 
 
