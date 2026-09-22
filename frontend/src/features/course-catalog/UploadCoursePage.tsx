@@ -102,7 +102,7 @@ export default function UploadCoursePage() {
       <Stack gap="lg">
         <Stack gap={4}>
           <Anchor component={Link} to="/" size="sm">
-            ← All courses
+            ← My courses
           </Anchor>
           <Title order={1}>Upload Course</Title>
           <Text c="dimmed" size="sm">

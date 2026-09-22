@@ -8,12 +8,16 @@ the server-managed free-credit path and the BYO-API-key path.
 import os
 from dataclasses import dataclass, field
 from functools import lru_cache
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from dotenv import load_dotenv
 from langchain_anthropic import ChatAnthropic
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import BaseMessage, SystemMessage
+from pydantic import BaseModel
+
+if TYPE_CHECKING:
+    from app.agent.budget import TokenBudget
 
 # Chat model integrations read API keys from process environment variables.
 # pydantic-settings parsing .env in app/config.py does not automatically set
@@ -22,6 +26,31 @@ load_dotenv()
 
 ModelTier = Literal["fast", "standard", "strong"]
 SupportedProvider = Literal["anthropic"]
+CallPurpose = Literal[
+    "generate", "evaluate", "solve", "screen", "generate_activities_fix"
+]
+
+
+@dataclass(frozen=True)
+class CallUsage:
+    """Token counts for one model call, for cost and quality measurement."""
+
+    purpose: CallPurpose
+    tier: ModelTier
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cache_read_tokens: int = 0
+    cache_creation_tokens: int = 0
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "purpose": self.purpose,
+            "tier": self.tier,
+            "input_tokens": self.input_tokens,
+            "output_tokens": self.output_tokens,
+            "cache_read_tokens": self.cache_read_tokens,
+            "cache_creation_tokens": self.cache_creation_tokens,
+        }
 
 
 @dataclass(frozen=True)
@@ -78,16 +107,22 @@ def _model_name_for(provider: SupportedProvider, tier: ModelTier) -> str:
 
 
 def tier_for_attempt(
-    default_tier: ModelTier, attempt: int, max_attempts: int
+    default_tier: ModelTier, attempt: int, max_attempts: int, *, escalate: bool = True
 ) -> ModelTier:
     """Which tier to generate with on a given attempt (1-indexed).
 
     Every attempt but the last uses the stage's normal tier. The last
     attempt (the one that must not fail, since there's no retry left after
-    it) escalates to `strong` as a quality backstop. This keeps `strong`
-    off the common path entirely.
+    it) escalates to `strong` as a quality backstop - but only when
+    `escalate` is True. This keeps `strong` off the common path entirely.
+
+    Pass `escalate=False` when every earlier attempt failed the cheap,
+    deterministic check (wrong count, wrong shape) rather than the
+    qualitative judge. A stronger model has no particular advantage at
+    satisfying a structural check a cheaper model already could - paying
+    `strong` prices for a miscount is spend with no expected return.
     """
-    if attempt >= max_attempts and default_tier != "strong":
+    if attempt >= max_attempts and default_tier != "strong" and escalate:
         return "strong"
     return default_tier
 
@@ -99,3 +134,54 @@ def cached_system_message(text: str, *, provider: SupportedProvider) -> SystemMe
             {"type": "text", "text": text, "cache_control": {"type": "ephemeral"}}
         ]
     )
+
+
+def _usage_from_message(
+    message: object, *, purpose: CallPurpose, tier: ModelTier
+) -> CallUsage:
+    usage = getattr(message, "usage_metadata", None) or {}
+    details = usage.get("input_token_details") or {}
+    return CallUsage(
+        purpose=purpose,
+        tier=tier,
+        input_tokens=usage.get("input_tokens", 0),
+        output_tokens=usage.get("output_tokens", 0),
+        cache_read_tokens=details.get("cache_read", 0),
+        cache_creation_tokens=details.get("cache_creation", 0),
+    )
+
+
+def invoke_structured[T: BaseModel](
+    *,
+    schema: type[T],
+    messages: list[BaseMessage],
+    tier: ModelTier,
+    model_config: GenerationModelConfig,
+    purpose: CallPurpose,
+    calls: list[CallUsage],
+    budget: "TokenBudget | None" = None,
+) -> T:
+    """One structured-output call, with its token usage appended to `calls`
+    and, when `budget` is given, reported to the job's whole-run ceiling.
+
+    `include_raw=True` keeps the raw message, which carries usage_metadata.
+    It also turns a parsing failure into a returned error instead of a
+    raised one, so this re-raises it to keep the retry behavior in
+    stage.py unchanged.
+    """
+    model = get_model(tier=tier, model_config=model_config)
+    result = model.with_structured_output(schema, include_raw=True).invoke(messages)
+    if not isinstance(result, dict):
+        return result
+
+    usage = _usage_from_message(result.get("raw"), purpose=purpose, tier=tier)
+    calls.append(usage)
+    if budget is not None:
+        budget.record(usage)
+    parsed = result.get("parsed")
+    if parsed is None:
+        raise ValueError(
+            f"Model did not return a valid {schema.__name__}: "
+            f"{result.get('parsing_error')}"
+        )
+    return parsed

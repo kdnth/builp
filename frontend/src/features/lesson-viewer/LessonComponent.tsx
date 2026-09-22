@@ -1,6 +1,16 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Lesson } from '../../types/lesson'
-import { Box, Button, Group, Paper, Stack, Stepper, Title } from '@mantine/core'
+import {
+  Box,
+  Button,
+  Group,
+  Paper,
+  Stack,
+  Stepper,
+  Text,
+  Title,
+} from '@mantine/core'
+import { useMediaQuery } from '@mantine/hooks'
 import { ArrowRightIcon } from '@phosphor-icons/react'
 import type { LessonView } from '../../types/lessonView'
 import {
@@ -8,6 +18,7 @@ import {
   isInteractivePractice,
   isWrittenLesson,
 } from '../../helpers/typeGuards'
+import { lessonPages } from '../../helpers/lessonPages'
 import LessonViewRenderer from './LessonViewRenderer'
 import ActivityAlert from './ActivityAlert'
 
@@ -29,8 +40,8 @@ export default function LessonComponent({
   nextAction,
   isFinalLesson,
 }: LessonComponentProps) {
-  const pageCount =
-    1 + lesson.codePractices.length + lesson.interactivePractices.length
+  const pages: LessonView[] = lessonPages(lesson)
+  const pageCount = pages.length
   const [active, setActive] = useState(0)
   const [practiceCompletion, setPracticeCompletion] = useState<
     Record<string, boolean>
@@ -57,12 +68,7 @@ export default function LessonComponent({
     }
   }, [active, pageCount, onComplete])
 
-  const pages: LessonView[] = [
-    lesson.writtenLesson,
-    ...lesson.codePractices,
-    ...lesson.interactivePractices,
-  ]
-
+  const compact = useMediaQuery('(max-width: 48em)') ?? false
   const currentPage = pages[active]
   const currentPageReady =
     currentPage === undefined ||
@@ -82,7 +88,19 @@ export default function LessonComponent({
   return (
     <Stack gap="md" m={8} p={4}>
       <Title order={1}>{lesson.title}</Title>
-      <Stepper active={active} onStepClick={setActive}>
+      {compact && (
+        <Text size="sm" c="dimmed">
+          {active < pageCount
+            ? `Step ${active + 1} of ${pageCount}: ${pages[active].title}`
+            : 'Lesson complete'}
+        </Text>
+      )}
+      <Stepper
+        active={active}
+        onStepClick={setActive}
+        // Step labels stack into a tall wall of text on a phone.
+        styles={compact ? { steps: { display: 'none' } } : undefined}
+      >
         {pages.map((page) => (
           <Stepper.Step
             key={page.id}

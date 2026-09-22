@@ -4,6 +4,18 @@ import { useCallback, useEffect, useState } from 'react'
 import type { InteractivePractice } from '../../types/interactivePractice'
 import ActivityComponentRenderer from './ActivityComponentRenderer'
 
+const ACTIVITY_LABELS: Record<
+  InteractivePractice['activities'][number]['type'],
+  string
+> = {
+  matching: 'Matching',
+  fillBlank: 'Fill in the blank',
+  multipleChoice: 'Multiple choice',
+  ordering: 'Put in order',
+  categorize: 'Sort into groups',
+  numeric: 'Work it out',
+}
+
 interface InteractivePracticeViewProps {
   view: InteractivePractice
   onAllActivitiesComplete?: (practiceId: string, allComplete: boolean) => void
@@ -49,7 +61,7 @@ export default function InteractivePracticeView({
         <Group gap="xs">
           {view.activities.map((activity) => (
             <Badge key={activity.id} color="teal" variant="light">
-              {activity.type}
+              {ACTIVITY_LABELS[activity.type]}
             </Badge>
           ))}
         </Group>

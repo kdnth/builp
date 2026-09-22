@@ -1,6 +1,9 @@
 import type { ReactNode } from 'react'
 import { ActionIcon, Group, Title, Tooltip } from '@mantine/core'
-import { ArrowCounterClockwiseIcon, CheckCircleIcon } from '@phosphor-icons/react'
+import {
+  ArrowCounterClockwiseIcon,
+  CheckCircleIcon,
+} from '@phosphor-icons/react'
 import type { ActivityStatus } from '../../types/activityStatus'
 
 interface ActivityHeaderProps {
@@ -32,7 +35,10 @@ export default function ActivityHeader({
       <Title order={titleOrder}>{title}</Title>
       <Group gap="xs">
         {extra}
-        <CheckCircleIcon color={color} weight={status === 'correct' ? 'fill' : 'regular'} />
+        <CheckCircleIcon
+          color={color}
+          weight={status === 'correct' ? 'fill' : 'regular'}
+        />
         <Tooltip label="Start over">
           <ActionIcon
             variant="subtle"

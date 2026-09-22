@@ -7,6 +7,7 @@ from sqlalchemy.orm import sessionmaker
 from app.agent.graph import build_graph, run_generation
 from app.agent.progress import DatabaseProgressReporter
 from app.agent.run import run_generation_job
+from app.agent.schemas import ScreeningDecision
 from app.models import GenerationJob
 from tests.test_agent_graph import (
     _passing_lesson_content,
@@ -24,9 +25,9 @@ class RecordingReporter:
         with self._lock:
             self.calls.append(("stage", stage))
 
-    def adjust_lessons_total(self, delta):
+    def set_lessons_total(self, total):
         with self._lock:
-            self.calls.append(("adjust", delta))
+            self.calls.append(("total", total))
 
     def lesson_completed(self):
         with self._lock:
@@ -69,10 +70,10 @@ def test_graph_reports_stages_and_every_completed_lesson():
     assert "lessons" in stages
     assert stages[-1] == "assembling"
     assert [kind for kind, _ in reporter.calls].count("lesson") == 6
-    assert not [call for call in reporter.calls if call[0] == "adjust"]
+    assert ("total", 6) in reporter.calls
 
 
-def test_graph_adjusts_lesson_total_when_an_outline_has_a_different_count():
+def test_graph_reports_the_real_lesson_total_when_an_outline_is_short():
     def uneven_outline(**kwargs):
         outcome = _passing_unit_outline(**kwargs)
         if kwargs["unit"].title == "Unit 2":
@@ -94,7 +95,7 @@ def test_graph_adjusts_lesson_total_when_an_outline_has_a_different_count():
         graph=graph,
     )
 
-    assert ("adjust", -1) in reporter.calls
+    assert ("total", 3) in reporter.calls
     assert [kind for kind, _ in reporter.calls].count("lesson") == 3
 
 
@@ -107,7 +108,7 @@ def test_database_reporter_updates_the_job_row(db_session):
         "job-1", sessionmaker(bind=db_session.get_bind())
     )
     reporter.stage("lessons")
-    reporter.adjust_lessons_total(-1)
+    reporter.set_lessons_total(3)
     reporter.lesson_completed()
     reporter.lesson_completed()
 
@@ -149,6 +150,10 @@ def test_run_generation_job_sets_initial_progress_and_reports(db_session):
     with (
         patch("app.agent.run.SessionLocal", factory),
         patch("app.agent.run.run_generation", fake_run_generation),
+        patch(
+            "app.agent.run.screen_topic",
+            return_value=ScreeningDecision(allowed=True),
+        ),
     ):
         run_generation_job("job-1")
 

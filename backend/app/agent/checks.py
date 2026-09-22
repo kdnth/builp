@@ -13,13 +13,25 @@ import re
 import subprocess
 import sys
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 
+from app.agent.activity_checks import (
+    check_activity_grounding,
+    check_categorize_answerability,
+    check_fill_blank_answerability,
+    check_multiple_choice_quality,
+    check_option_explanations,
+    check_ordering_answerability,
+)
 from app.agent.schemas import (
+    CodePracticePolicy,
+    CourseBrief,
     CourseOverview,
     GeneratedFillBlankActivity,
     GeneratedFunctionPractice,
     GeneratedMultipleChoiceActivity,
+    GeneratedNumericActivity,
     LessonContent,
     UnitOutline,
 )
@@ -46,6 +58,25 @@ def check_outline_lesson_count(outline: UnitOutline, expected: int) -> list[str]
             "were requested. Add or remove lessons to match exactly."
         ]
     return []
+
+
+def check_outline_lessons(outline: UnitOutline, brief: CourseBrief) -> list[str]:
+    """Each lesson must use a profile the brief allows, and a course with no
+    code practice must not ask for one."""
+    problems: list[str] = []
+    for index, lesson in enumerate(outline.lessons, start=1):
+        if lesson.profile not in brief.lesson_profiles:
+            problems.append(
+                f"lesson {index} uses profile '{lesson.profile}', which is not "
+                f"one of the course's profiles "
+                f"({', '.join(brief.lesson_profiles)})"
+            )
+        if lesson.include_code_practice and brief.code_practice_policy == "none":
+            problems.append(
+                f"lesson {index} asks for a code practice, but this course has "
+                "no code practice"
+            )
+    return problems
 
 
 def _function_name(signature: str) -> str:
@@ -182,7 +213,10 @@ def _run_check_script(command: list[str], script: str, suffix: str) -> str | Non
             env={"PATH": os.environ.get("PATH", "")},
         )
     except FileNotFoundError:
-        return None
+        return (
+            f"the {command[0]} runtime is not installed on the server, so the "
+            "reference solution could not be checked"
+        )
     except subprocess.TimeoutExpired:
         return "reference solution timed out (possible infinite loop)"
     finally:
@@ -233,6 +267,58 @@ def check_function_practice_consistency(
     return _run_check_script(["node"], script, ".js")
 
 
+_NUMERIC_CHECK_TEMPLATE = """
+import json
+import math
+
+expression = %(expression)s
+answer = %(answer)s
+tolerance = %(tolerance)s
+
+SAFE = {"__builtins__": {}, "math": math, "abs": abs, "round": round}
+
+
+def report(ok, problem=None):
+    print()
+    print(json.dumps({"ok": ok, "problem": problem}))
+    raise SystemExit(0)
+
+
+try:
+    value = eval(expression, SAFE)
+except Exception as exc:
+    report(False, f"answer_expression failed: {type(exc).__name__}: {exc}")
+
+try:
+    value = float(value)
+except (TypeError, ValueError):
+    report(False, f"answer_expression returned {value!r}, which is not a number")
+
+if abs(value - answer) <= max(tolerance, 1e-9):
+    report(True)
+
+report(
+    False,
+    f"answer_expression computes {value}, but answer says {answer} "
+    f"(tolerance {tolerance})",
+)
+"""
+
+
+def check_numeric_consistency(activity: GeneratedNumericActivity) -> str | None:
+    """Run the model's own expression and compare it with the answer it wrote.
+
+    This is what the reference solution check does for code: the number is
+    verified by running something, not by trusting the model twice.
+    """
+    script = _NUMERIC_CHECK_TEMPLATE % {
+        "expression": repr(activity.answer_expression),
+        "answer": repr(float(activity.answer)),
+        "tolerance": repr(float(activity.tolerance)),
+    }
+    return _run_check_script([sys.executable, "-I"], script, ".py")
+
+
 def check_fill_blank_consistency(activity: GeneratedFillBlankActivity) -> str | None:
     blank_count = activity.text.count("{{blank}}")
     if blank_count != len(activity.blanks):
@@ -254,30 +340,73 @@ def check_multiple_choice_consistency(
     return None
 
 
+@dataclass(frozen=True)
+class LessonCheckResult:
+    """The two kinds of problem a lesson check can find, kept apart so a
+    retry caused only by an activity problem can ask for new activities
+    alone instead of paying to rewrite the whole lesson - see
+    generate_lesson_content in nodes.py."""
+
+    structural: list[str]
+    activity: list[str]
+
+    @property
+    def combined(self) -> list[str]:
+        return self.structural + self.activity
+
+
+def check_lesson_content_split(
+    content: LessonContent, *, language: CodePracticePolicy
+) -> LessonCheckResult:
+    """Every deterministic check applicable to a generated lesson, split
+    by whether fixing it needs the written content and code practice
+    rewritten (structural) or only the activities (activity)."""
+    structural: list[str] = []
+    activity: list[str] = []
+
+    if content.code_practice is not None:
+        if language == "none":
+            structural.append(
+                "this lesson has a code practice, but this lesson was asked "
+                "not to have one"
+            )
+        else:
+            problem = check_function_practice_consistency(
+                content.code_practice, language=language
+            )
+            if problem:
+                structural.append(problem)
+
+    for act in content.interactive_activities:
+        if act.type == "fillBlank":
+            problem = check_fill_blank_consistency(act)
+            activity.extend(check_fill_blank_answerability(act))
+        elif act.type == "multipleChoice":
+            problem = check_multiple_choice_consistency(act)
+            activity.extend(check_multiple_choice_quality(act))
+            activity.extend(check_option_explanations(act))
+        elif act.type == "ordering":
+            problem = None
+            activity.extend(check_ordering_answerability(act))
+        elif act.type == "categorize":
+            problem = None
+            activity.extend(check_categorize_answerability(act))
+        elif act.type == "numeric":
+            problem = check_numeric_consistency(act)
+        else:
+            problem = None
+        if problem:
+            activity.append(problem)
+        activity.extend(check_activity_grounding(act, content.written_lesson_markdown))
+
+    return LessonCheckResult(structural=structural, activity=activity)
+
+
 def check_lesson_content(
-    content: LessonContent, *, language: CodeLanguage
+    content: LessonContent, *, language: CodePracticePolicy
 ) -> list[str]:
     """Every deterministic check applicable to a generated lesson.
 
     Returns a list of problems, empty if everything checks out.
     """
-    problems: list[str] = []
-
-    if content.code_practice is not None:
-        problem = check_function_practice_consistency(
-            content.code_practice, language=language
-        )
-        if problem:
-            problems.append(problem)
-
-    for activity in content.interactive_activities:
-        if activity.type == "fillBlank":
-            problem = check_fill_blank_consistency(activity)
-        elif activity.type == "multipleChoice":
-            problem = check_multiple_choice_consistency(activity)
-        else:
-            problem = None
-        if problem:
-            problems.append(problem)
-
-    return problems
+    return check_lesson_content_split(content, language=language).combined

@@ -8,5 +8,6 @@ export interface Matching {
   type: 'matching'
   id: string
   description?: string | null
+  explanation?: string | null
   pairs: Pair[]
 }

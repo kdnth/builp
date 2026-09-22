@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 class ProgressReporter(Protocol):
     def stage(self, stage: GenerationStage) -> None: ...
 
-    def adjust_lessons_total(self, delta: int) -> None: ...
+    def set_lessons_total(self, total: int) -> None: ...
 
     def lesson_completed(self) -> None: ...
 
@@ -30,7 +30,7 @@ class NoopProgressReporter:
     def stage(self, stage: GenerationStage) -> None:
         pass
 
-    def adjust_lessons_total(self, delta: int) -> None:
+    def set_lessons_total(self, total: int) -> None:
         pass
 
     def lesson_completed(self) -> None:
@@ -45,8 +45,8 @@ class DatabaseProgressReporter:
     def stage(self, stage: GenerationStage) -> None:
         self._update(stage=stage)
 
-    def adjust_lessons_total(self, delta: int) -> None:
-        self._update(lessons_total=GenerationJob.lessons_total + delta)
+    def set_lessons_total(self, total: int) -> None:
+        self._update(lessons_total=total)
 
     def lesson_completed(self) -> None:
         self._update(lessons_completed=GenerationJob.lessons_completed + 1)

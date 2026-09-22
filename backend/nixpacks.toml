@@ -1,6 +1,11 @@
 [variables]
 NIXPACKS_PYTHON_PACKAGE_MANAGER = "uv"
 
+# Node runs the JavaScript reference-solution check during course
+# generation. "..." keeps the packages the Python provider adds.
+[phases.setup]
+nixPkgs = ["...", "nodejs_22"]
+
 [phases.install]
 cmds = [
   "python -m venv --copies /opt/venv",

@@ -25,6 +25,20 @@ _TestingSessionLocal = sessionmaker(bind=_engine, autoflush=False, autocommit=Fa
 
 
 @pytest.fixture(autouse=True)
+def _no_model_calls(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Tests must never reach a real provider. A test that needs a model
+    patches get_model (or the function that calls it) itself."""
+
+    def _refuse(*args: object, **kwargs: object):
+        raise AssertionError(
+            "This test tried to call a real model. Patch get_model or the "
+            "agent function under test."
+        )
+
+    monkeypatch.setattr("app.agent.llm.get_model", _refuse)
+
+
+@pytest.fixture(autouse=True)
 def _clean_database() -> Iterator[None]:
     Base.metadata.create_all(_engine)
     yield

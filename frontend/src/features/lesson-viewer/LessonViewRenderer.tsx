@@ -10,7 +10,10 @@ import WrittenLessonView from './WrittenLessonView'
 
 interface LessonViewRendererProps {
   view: LessonView
-  onInteractivePracticeComplete?: (practiceId: string, allComplete: boolean) => void
+  onInteractivePracticeComplete?: (
+    practiceId: string,
+    allComplete: boolean,
+  ) => void
 }
 
 export default function LessonViewRenderer({

@@ -1,0 +1,8 @@
+/* Markdown inside an activity is one line of text, not a document. */
+.lesson-markdown-inline > * > :first-child {
+  margin-top: 0;
+}
+.lesson-markdown-inline p {
+  margin: 0;
+  display: inline;
+}

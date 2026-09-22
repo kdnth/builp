@@ -2,7 +2,11 @@ import { useEffect, useRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Anchor } from '@mantine/core'
 import { notifications } from '@mantine/notifications'
-import { CheckCircleIcon, WarningCircleIcon } from '@phosphor-icons/react'
+import {
+  CheckCircleIcon,
+  SignpostIcon,
+  WarningCircleIcon,
+} from '@phosphor-icons/react'
 import { listGenerationJobs, type GenerationJob } from '../../lib/api'
 import { useAuthSession } from '../../lib/auth'
 import {
@@ -20,31 +24,59 @@ import { isActiveJob } from './generationProgress'
 const POLL_INTERVAL_MS = 3000
 const ERROR_RETRY_MS = 15000
 
+type FinishedLook = {
+  color: string
+  icon: React.ReactNode
+  title: string
+  linkText: string
+}
+
+function look(job: GenerationJob): FinishedLook {
+  if (job.status === 'succeeded' && job.course_id) {
+    return {
+      color: 'green',
+      icon: <CheckCircleIcon weight="fill" size={20} />,
+      title: 'Your course is ready',
+      linkText: `Open "${job.topic}"`,
+    }
+  }
+  if (job.status === 'refused') {
+    return {
+      color: 'yellow',
+      icon: <SignpostIcon weight="fill" size={20} />,
+      title: 'This topic is not a fit',
+      linkText: 'See why',
+    }
+  }
+  return {
+    color: 'red',
+    icon: <WarningCircleIcon weight="fill" size={20} />,
+    title: 'Course generation failed',
+    linkText: 'See what went wrong',
+  }
+}
+
 function showFinishedNotification(job: GenerationJob) {
   const id = `generation-job-${job.id}`
-  const succeeded = job.status === 'succeeded' && job.course_id
+  const { color, icon, title, linkText } = look(job)
+  const to =
+    job.status === 'succeeded' && job.course_id
+      ? `/courses/${job.course_id}`
+      : `/courses/generate/${job.id}`
   notifications.show({
     id,
-    color: succeeded ? 'green' : 'red',
-    icon: succeeded ? (
-      <CheckCircleIcon weight="fill" size={20} />
-    ) : (
-      <WarningCircleIcon weight="fill" size={20} />
-    ),
-    title: succeeded ? 'Your course is ready' : 'Course generation failed',
+    color,
+    icon,
+    title,
     autoClose: 15000,
     message: (
       <Anchor
         component={Link}
-        to={
-          succeeded
-            ? `/courses/${job.course_id}`
-            : `/courses/generate/${job.id}`
-        }
+        to={to}
         size="sm"
         onClick={() => notifications.hide(id)}
       >
-        {succeeded ? `Open "${job.topic}"` : 'See what went wrong'}
+        {linkText}
       </Anchor>
     ),
   })

@@ -1,6 +1,14 @@
 from datetime import UTC, datetime
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -15,6 +23,9 @@ class Course(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     title: Mapped[str] = mapped_column(String, nullable=False)
+    course_type: Mapped[str] = mapped_column(
+        String, nullable=False, default="programming", server_default="programming"
+    )
     data: Mapped[dict] = mapped_column(JSON, nullable=False)
     owner_user_id: Mapped[str | None] = mapped_column(String, nullable=True)
     tags: Mapped[list[str]] = mapped_column(
@@ -79,14 +90,28 @@ class GenerationJob(Base):
     audience: Mapped[str] = mapped_column(String, nullable=False)
     num_units: Mapped[int] = mapped_column(Integer, nullable=False)
     lessons_per_unit: Mapped[int] = mapped_column(Integer, nullable=False)
+    course_type: Mapped[str] = mapped_column(
+        String, nullable=False, default="programming", server_default="programming"
+    )
     language: Mapped[str] = mapped_column(
         String, nullable=False, default="javascript", server_default="javascript"
     )
+    learning_goals: Mapped[str | None] = mapped_column(String, nullable=True)
+    level: Mapped[str] = mapped_column(
+        String, nullable=False, default="beginner", server_default="beginner"
+    )
+    notes: Mapped[str | None] = mapped_column(String, nullable=True)
+    reading_style: Mapped[str] = mapped_column(
+        String, nullable=False, default="single", server_default="single"
+    )
+    refusal_category: Mapped[str | None] = mapped_column(String, nullable=True)
+    refusal_reason: Mapped[str | None] = mapped_column(String, nullable=True)
     stage: Mapped[str | None] = mapped_column(String, nullable=True)
     lessons_total: Mapped[int | None] = mapped_column(Integer, nullable=True)
     lessons_completed: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0, server_default="0"
     )
+    metrics: Mapped[dict | None] = mapped_column(JSON, nullable=True)
       
     course_id: Mapped[str | None] = mapped_column(
         ForeignKey("courses.id", ondelete="SET NULL"), nullable=True
@@ -97,4 +122,30 @@ class GenerationJob(Base):
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
+    )
+
+
+class GenerationStageMetric(Base):
+    """One row per stage run of a generation job. See app/agent/metrics.py."""
+
+    __tablename__ = "generation_stage_metrics"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    job_id: Mapped[str] = mapped_column(
+        ForeignKey("generation_jobs.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    stage: Mapped[str] = mapped_column(String, nullable=False)
+    passed: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False)
+    input_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    cache_read_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    cache_creation_tokens: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0
+    )
+    detail: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
     )

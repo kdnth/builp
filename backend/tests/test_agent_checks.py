@@ -2,21 +2,20 @@ from app.agent.checks import (
     check_fill_blank_consistency,
     check_function_practice_consistency,
     check_lesson_content,
+    check_lesson_content_split,
     check_multiple_choice_consistency,
     check_outline_lesson_count,
     check_overview_unit_count,
 )
 from app.agent.schemas import (
-    CourseOverview,
     GeneratedFillBlankActivity,
     GeneratedFunctionPractice,
     GeneratedMultipleChoiceActivity,
     GeneratedTestCase,
-    LessonContent,
-    LessonSummary,
     UnitOutline,
     UnitSummary,
 )
+from tests.factories import make_lesson_content, make_lesson_summary, make_overview
 
 
 def _practice(reference_solution: str, cases: list[tuple[list[object], object]]):
@@ -159,12 +158,12 @@ def test_consistency_check_does_not_expose_server_environment(monkeypatch):
 
 
 def test_check_lesson_content_uses_the_requested_language():
-    content = LessonContent(
-        written_lesson_markdown="# hi",
+    content = make_lesson_content(
+        markdown="# hi",
         code_practice=_python_practice(
             "def add(a, b):\n    return a + b", [([1, 2], 3), ([5, 5], 10)]
         ),
-        interactive_activities=[],
+        activities=[],
     )
     assert check_lesson_content(content, language="python") == []
     assert len(check_lesson_content(content, language="javascript")) == 1
@@ -203,12 +202,12 @@ def test_multiple_choice_consistency_catches_out_of_range():
 
 
 def test_check_lesson_content_aggregates_all_problems():
-    content = LessonContent(
-        written_lesson_markdown="# hi",
+    content = make_lesson_content(
+        markdown="# hi",
         code_practice=_practice(
             "function add(a, b) { return a + b }", [([1, 2], 999), ([5, 5], 10)]
         ),
-        interactive_activities=[
+        activities=[
             GeneratedMultipleChoiceActivity(
                 question="2 + 2?", options=["3", "4"], correct_index=5
             ),
@@ -218,11 +217,41 @@ def test_check_lesson_content_aggregates_all_problems():
     assert len(problems) == 2
 
 
-def test_check_lesson_content_empty_when_clean():
-    content = LessonContent(
-        written_lesson_markdown="# hi",
+def test_check_lesson_content_split_buckets_code_practice_as_structural():
+    content = make_lesson_content(
+        markdown="# hi",
+        code_practice=_practice(
+            "function add(a, b) { return a + b }", [([1, 2], 999), ([5, 5], 10)]
+        ),
+        activities=[],
+    )
+    result = check_lesson_content_split(content, language="javascript")
+    assert len(result.structural) == 1
+    assert result.activity == []
+    assert result.combined == result.structural
+
+
+def test_check_lesson_content_split_buckets_activity_problems_as_activity():
+    content = make_lesson_content(
+        markdown="# hi",
         code_practice=None,
-        interactive_activities=[
+        activities=[
+            GeneratedMultipleChoiceActivity(
+                question="2 + 2?", options=["3", "4"], correct_index=5
+            ),
+        ],
+    )
+    result = check_lesson_content_split(content, language="javascript")
+    assert result.structural == []
+    assert len(result.activity) == 1
+    assert result.combined == result.activity
+
+
+def test_check_lesson_content_empty_when_clean():
+    content = make_lesson_content(
+        markdown="# hi",
+        code_practice=None,
+        activities=[
             GeneratedMultipleChoiceActivity(
                 question="2 + 2?", options=["3", "4"], correct_index=1
             ),
@@ -231,15 +260,58 @@ def test_check_lesson_content_empty_when_clean():
     assert check_lesson_content(content, language="javascript") == []
 
 
-def _overview(num_units: int) -> CourseOverview:
-    return CourseOverview(
-        title="Course",
-        description="A course.",
-        audience="Everyone.",
+def _overview(num_units: int):
+    return make_overview(
         units=[
             UnitSummary(title=f"Unit {i + 1}", goal="Goal.") for i in range(num_units)
         ],
     )
+
+
+def test_outline_lessons_must_use_a_profile_from_the_brief():
+    from app.agent.checks import check_outline_lessons
+    from tests.factories import make_brief, make_outline
+
+    brief = make_brief(lesson_profiles=["narrative"])
+    outline = make_outline(profile="quantitative")
+
+    problems = check_outline_lessons(outline, brief)
+    assert len(problems) == 1
+    assert "quantitative" in problems[0] and "narrative" in problems[0]
+
+
+def test_outline_cannot_ask_for_code_when_the_course_has_none():
+    from app.agent.checks import check_outline_lessons
+    from tests.factories import make_brief, make_outline
+
+    brief = make_brief(lesson_profiles=["narrative"], code_practice_policy="none")
+    outline = make_outline(profile="narrative", include_code_practice=True)
+
+    problems = check_outline_lessons(outline, brief)
+    assert len(problems) == 1
+    assert "no code practice" in problems[0]
+
+
+def test_lesson_with_an_unwanted_code_practice_is_rejected():
+    content = make_lesson_content(
+        markdown="# hi",
+        code_practice=_practice(
+            "function add(a, b) { return a + b }", [([1, 2], 3), ([5, 5], 10)]
+        ),
+        activities=[],
+    )
+
+    problems = check_lesson_content(content, language="none")
+    assert len(problems) == 1
+    assert "asked" in problems[0]
+
+
+def test_a_missing_runtime_fails_instead_of_passing_silently():
+    from app.agent.checks import _run_check_script
+
+    problem = _run_check_script(["definitely-not-a-real-runtime"], "print(1)", ".py")
+    assert problem is not None
+    assert "not installed on the server" in problem
 
 
 def test_overview_unit_count_matches():
@@ -255,13 +327,7 @@ def test_overview_unit_count_mismatch():
 def _outline(num_lessons: int) -> UnitOutline:
     return UnitOutline(
         lessons=[
-            LessonSummary(
-                title=f"Lesson {i + 1}",
-                goal="Goal.",
-                include_code_practice=False,
-                interactive_activity_types=[],
-            )
-            for i in range(num_lessons)
+            make_lesson_summary(title=f"Lesson {i + 1}") for i in range(num_lessons)
         ]
     )
 

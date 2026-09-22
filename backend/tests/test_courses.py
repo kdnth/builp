@@ -19,6 +19,7 @@ def test_create_and_fetch_course(client, sample_course):
             {
                 "id": course_id,
                 "title": "Test Course",
+                "course_type": "programming",
                 "unit_count": 1,
                 "lesson_count": 1,
                 "tags": [],
@@ -115,9 +116,10 @@ def test_upload_keeps_forked_from_id_when_source_exists(client, sample_course):
 
     assert fork.status_code == 201
     assert fork.json()["forkedFromId"] == original["id"]
-    assert client.get(f"/api/courses/{fork.json()['id']}").json()[
-        "forkedFromId"
-    ] == original["id"]
+    assert (
+        client.get(f"/api/courses/{fork.json()['id']}").json()["forkedFromId"]
+        == original["id"]
+    )
 
 
 def test_upload_drops_forked_from_id_pointing_at_nothing(client, sample_course):
@@ -157,6 +159,32 @@ def test_create_course_without_auth_is_rejected(client, sample_course):
 
     assert response.status_code == 503
     assert client.get("/api/courses").json() == {"items": [], "total": 0}
+
+
+def test_courses_can_be_filtered_by_course_type(client, sample_course):
+    import copy
+
+    general = copy.deepcopy(sample_course)
+    general["id"] = "general-course"
+    general["title"] = "History of Rome"
+    general["courseType"] = "general"
+    general["units"][0]["lessons"][0]["codePractices"] = []
+    client.post("/api/courses", json=sample_course)
+    client.post("/api/courses", json=general)
+
+    everything = client.get("/api/courses").json()
+    programming = client.get("/api/courses?course_type=programming").json()
+    other = client.get("/api/courses?course_type=general").json()
+
+    assert everything["total"] == 2
+    assert [item["title"] for item in programming["items"]] == ["Test Course"]
+    assert [item["title"] for item in other["items"]] == ["History of Rome"]
+    assert other["items"][0]["course_type"] == "general"
+
+
+def test_uploaded_course_without_a_type_is_a_programming_course(client, sample_course):
+    course_id = client.post("/api/courses", json=sample_course).json()["id"]
+    assert client.get(f"/api/courses/{course_id}").json()["courseType"] == "programming"
 
 
 def test_search_matches_title_case_insensitively(client, sample_course):
@@ -288,7 +316,9 @@ def test_for_user_id_includes_owned_and_saved(client, sample_course):
 
     mine = client.get("/api/courses?for_user_id=user-1").json()["items"]
     assert {c["id"] for c in mine} == {owned["id"], others["id"]}
-    saved_flags = {c["id"]: c["saved"] for c in client.get("/api/courses").json()["items"]}
+    saved_flags = {
+        c["id"]: c["saved"] for c in client.get("/api/courses").json()["items"]
+    }
     assert saved_flags[owned["id"]] is True
     assert saved_flags[others["id"]] is True
 

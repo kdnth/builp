@@ -16,97 +16,153 @@ def _new_id() -> str:
     return str(uuid.uuid4())
 
 
+CourseActivity = (
+    course_schema.MatchingActivity
+    | course_schema.FillBlankActivity
+    | course_schema.MultipleChoiceActivity
+    | course_schema.OrderingActivity
+    | course_schema.CategorizeActivity
+    | course_schema.NumericActivity
+)
+
+
+def _assemble_activity(activity: gen.GeneratedActivity) -> CourseActivity:
+    if isinstance(activity, gen.GeneratedMatchingActivity):
+        return course_schema.MatchingActivity(
+            type="matching",
+            id=_new_id(),
+            description=activity.description,
+            explanation=activity.explanation,
+            pairs=[
+                course_schema.MatchingPair(
+                    id=_new_id(), term=pair.term, definition=pair.definition
+                )
+                for pair in activity.pairs
+            ],
+        )
+    if isinstance(activity, gen.GeneratedFillBlankActivity):
+        return course_schema.FillBlankActivity(
+            type="fillBlank",
+            id=_new_id(),
+            description=activity.description,
+            explanation=activity.explanation,
+            text=activity.text,
+            blanks=[
+                course_schema.Blank(position=index, accepted=blank.accepted)
+                for index, blank in enumerate(activity.blanks)
+            ],
+        )
+    if isinstance(activity, gen.GeneratedOrderingActivity):
+        return course_schema.OrderingActivity(
+            type="ordering",
+            id=_new_id(),
+            description=activity.description,
+            explanation=activity.explanation,
+            basis=activity.basis,
+            items=activity.items,
+        )
+
+    if isinstance(activity, gen.GeneratedCategorizeActivity):
+        return course_schema.CategorizeActivity(
+            type="categorize",
+            id=_new_id(),
+            description=activity.description,
+            explanation=activity.explanation,
+            categories=activity.categories,
+            items=[
+                course_schema.CategorizeItem(
+                    id=_new_id(), text=item.text, category=item.category
+                )
+                for item in activity.items
+            ],
+        )
+
+    if isinstance(activity, gen.GeneratedNumericActivity):
+        return course_schema.NumericActivity(
+            type="numeric",
+            id=_new_id(),
+            description=activity.description,
+            explanation=activity.explanation,
+            question=activity.question,
+            answer=activity.answer,
+            tolerance=activity.tolerance,
+            unit=activity.unit,
+        )
+
+    return course_schema.MultipleChoiceActivity(
+        type="multipleChoice",
+        id=_new_id(),
+        description=activity.description,
+        explanation=activity.explanation,
+        passage=activity.passage,
+        question=activity.question,
+        options=activity.options,
+        optionExplanations=activity.option_explanations,
+        correctIndex=activity.correct_index,
+    )
+
+
+def _assemble_code_practice(
+    practice: gen.GeneratedFunctionPractice, language: course_schema.CodeLanguage
+) -> course_schema.FunctionCodePractice:
+    return course_schema.FunctionCodePractice(
+        type="function",
+        id=_new_id(),
+        title=practice.title,
+        language=language,
+        functionSignature=practice.function_signature,
+        description=practice.description,
+        testSuite=[
+            course_schema.TestCase(input=tc.input, expectedOutput=tc.expected_output)
+            for tc in practice.test_suite
+        ],
+    )
+
+
 def assemble_lesson(
     title: str,
     content: gen.LessonContent,
     language: course_schema.CodeLanguage,
 ) -> course_schema.Lesson:
-    written_lesson = course_schema.WrittenLesson(
-        id=_new_id(), title=title, markdown=content.written_lesson_markdown
-    )
+    """One page for each written section, a check page after a section that
+    has activities, and the code practice after the last section."""
+    pages: list[course_schema.LessonPage] = []
 
-    code_practices: list[course_schema.FunctionCodePractice] = []
-    if content.code_practice is not None:
-        cp = content.code_practice
-        code_practices.append(
-            course_schema.FunctionCodePractice(
-                type="function",
-                id=_new_id(),
-                title=cp.title,
-                language=language,
-                functionSignature=cp.function_signature,
-                description=cp.description,
-                testSuite=[
-                    course_schema.TestCase(
-                        input=tc.input, expectedOutput=tc.expected_output
-                    )
-                    for tc in cp.test_suite
-                ],
+    for index, section in enumerate(content.sections):
+        pages.append(
+            course_schema.WrittenPage(
+                kind="written",
+                written=course_schema.WrittenLesson(
+                    id=_new_id(), title=section.title, markdown=section.markdown
+                ),
             )
         )
 
-    activities: list[
-        course_schema.MatchingActivity
-        | course_schema.FillBlankActivity
-        | course_schema.MultipleChoiceActivity
-    ] = []
-    for activity in content.interactive_activities:
-        if isinstance(activity, gen.GeneratedMatchingActivity):
-            activities.append(
-                course_schema.MatchingActivity(
-                    type="matching",
-                    id=_new_id(),
-                    description=activity.description,
-                    pairs=[
-                        course_schema.MatchingPair(
-                            id=_new_id(), term=pair.term, definition=pair.definition
-                        )
-                        for pair in activity.pairs
-                    ],
-                )
-            )
-        elif isinstance(activity, gen.GeneratedFillBlankActivity):
-            activities.append(
-                course_schema.FillBlankActivity(
-                    type="fillBlank",
-                    id=_new_id(),
-                    description=activity.description,
-                    text=activity.text,
-                    blanks=[
-                        course_schema.Blank(position=index, accepted=blank.accepted)
-                        for index, blank in enumerate(activity.blanks)
-                    ],
-                )
-            )
-        elif isinstance(activity, gen.GeneratedMultipleChoiceActivity):
-            activities.append(
-                course_schema.MultipleChoiceActivity(
-                    type="multipleChoice",
-                    id=_new_id(),
-                    description=activity.description,
-                    question=activity.question,
-                    options=activity.options,
-                    correctIndex=activity.correct_index,
+        is_last_section = index == len(content.sections) - 1
+        if is_last_section and content.code_practice is not None:
+            pages.append(
+                course_schema.CodePage(
+                    kind="code",
+                    practice=_assemble_code_practice(content.code_practice, language),
                 )
             )
 
-    interactive_practices = (
-        [
-            course_schema.InteractivePractice(
-                id=_new_id(), title=f"{title} Practice", activities=activities
+        if section.activities:
+            pages.append(
+                course_schema.InteractivePage(
+                    kind="interactive",
+                    practice=course_schema.InteractivePractice(
+                        id=_new_id(),
+                        title=f"{section.title} check",
+                        activities=[
+                            _assemble_activity(activity)
+                            for activity in section.activities
+                        ],
+                    ),
+                )
             )
-        ]
-        if activities
-        else []
-    )
 
-    return course_schema.Lesson(
-        id=_new_id(),
-        title=title,
-        writtenLesson=written_lesson,
-        codePractices=code_practices,
-        interactivePractices=interactive_practices,
-    )
+    return course_schema.Lesson(id=_new_id(), title=title, pages=pages)
 
 
 def assemble_course(

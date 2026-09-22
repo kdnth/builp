@@ -9,7 +9,14 @@ app/agent/assemble.py.
 import json
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, BeforeValidator, Field, JsonValue, WithJsonSchema
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    Field,
+    JsonValue,
+    WithJsonSchema,
+    model_validator,
+)
 
 
 def _parse_json_encoded_value(value: object) -> object:
@@ -29,6 +36,8 @@ def _parse_json_encoded_value(value: object) -> object:
             return value
     return value
 
+
+MAX_LESSON_ACTIVITIES = 8
 
 # LLM schema: a JSON string. Python type: any JSON value.
 JsonEncodedValue = Annotated[
@@ -56,6 +65,72 @@ class UnitSummary(BaseModel):
     )
 
 
+LessonProfile = Literal[
+    "conceptual",
+    "procedural",
+    "quantitative",
+    "narrative",
+    "language",
+    "programming",
+]
+Sensitivity = Literal["none", "health", "legal", "financial", "safety"]
+CodePracticePolicy = Literal["none", "python", "javascript"]
+
+
+class GlossaryTerm(BaseModel):
+    term: str
+    definition: str = Field(description="One line, in plain words.")
+
+
+class CourseBrief(BaseModel):
+    """Shared context every later stage reads. Lessons are written in
+    parallel, so without this they drift apart in terms and depth."""
+
+    domain: str = Field(
+        description="The field this course sits in, e.g. 'Macroeconomics'."
+    )
+    lesson_profiles: list[LessonProfile] = Field(
+        min_length=1,
+        max_length=3,
+        description="The kinds of lesson this course needs. Every lesson in "
+        "the course must use one of these.",
+    )
+    learning_objectives: list[str] = Field(
+        min_length=3,
+        max_length=6,
+        description="What the learner can do at the end. Each one must be "
+        "observable, not 'understand X'.",
+    )
+    prerequisites: list[str] = Field(
+        default_factory=list, description="What the learner must already know."
+    )
+    glossary: list[GlossaryTerm] = Field(
+        default_factory=list,
+        max_length=30,
+        description="Key terms with one-line definitions. Every lesson uses "
+        "these words with these meanings.",
+    )
+    misconceptions: list[str] = Field(
+        default_factory=list,
+        description="Common wrong beliefs about this topic. Use them as wrong "
+        "options in multiple choice activities.",
+    )
+    conventions: str = Field(
+        default="",
+        description="Units, notation, date format, spelling variant, or "
+        "dialect this course uses.",
+    )
+    sensitivity: Sensitivity = Field(
+        default="none",
+        description="Whether this subject touches health, legal, financial, "
+        "or safety decisions.",
+    )
+    code_practice_policy: CodePracticePolicy = Field(
+        description="Which language runnable code practices use, or 'none' "
+        "when this course should have no code practice."
+    )
+
+
 class CourseOverview(BaseModel):
     title: str
     description: str = Field(description="A short, learner-facing course summary.")
@@ -67,6 +142,7 @@ class CourseOverview(BaseModel):
         description="Ordered list of units, in the order a learner should take them.",
         min_length=1,
     )
+    brief: CourseBrief
 
 
 # --- Stage 2: unit outline (one call per unit) -------------------------
@@ -77,11 +153,24 @@ class LessonSummary(BaseModel):
     goal: str = Field(
         description="What the learner should be able to do after this lesson."
     )
+    profile: LessonProfile = Field(
+        description="The kind of lesson this is. Must be one of the course "
+        "brief's lesson_profiles."
+    )
     include_code_practice: bool = Field(
-        description="Whether this lesson should include a runnable code exercise."
+        description="Whether this lesson should include a runnable code "
+        "exercise. Only possible when the brief's code_practice_policy is "
+        "not 'none'."
     )
     interactive_activity_types: list[
-        Literal["matching", "fillBlank", "multipleChoice"]
+        Literal[
+            "matching",
+            "fillBlank",
+            "multipleChoice",
+            "ordering",
+            "categorize",
+            "numeric",
+        ]
     ] = Field(
         description="Which interactive activity types this lesson should "
         "include, in the order they should appear. Can be empty."
@@ -127,9 +216,17 @@ class GeneratedMatchingPair(BaseModel):
     definition: str
 
 
+EXPLANATION_FIELD = Field(
+    default=None,
+    description="One or two sentences telling the learner why the answer is "
+    "right, shown after they answer.",
+)
+
+
 class GeneratedMatchingActivity(BaseModel):
     type: Literal["matching"] = "matching"
     description: str | None = None
+    explanation: str | None = EXPLANATION_FIELD
     pairs: list[GeneratedMatchingPair] = Field(min_length=3)
 
 
@@ -143,6 +240,7 @@ class GeneratedBlank(BaseModel):
 class GeneratedFillBlankActivity(BaseModel):
     type: Literal["fillBlank"] = "fillBlank"
     description: str | None = None
+    explanation: str | None = EXPLANATION_FIELD
     text: str = Field(
         description="The passage with each blank written as {{blank}}, in "
         "order. The number of {{blank}} tokens must equal the number of "
@@ -154,33 +252,151 @@ class GeneratedFillBlankActivity(BaseModel):
 class GeneratedMultipleChoiceActivity(BaseModel):
     type: Literal["multipleChoice"] = "multipleChoice"
     description: str | None = None
+    explanation: str | None = EXPLANATION_FIELD
+    passage: str | None = Field(
+        default=None,
+        description="A short case, quote, or data table in markdown, shown "
+        "above the question. Use it when the question needs material to "
+        "reason about.",
+    )
     question: str
     options: list[str] = Field(min_length=2, max_length=6)
+    option_explanations: list[str] | None = Field(
+        default=None,
+        description="Why each option is right or wrong, in the same order as "
+        "`options`. Give one for every option, or none at all.",
+    )
     correct_index: int = Field(
         description="Index into `options` of the correct answer."
+    )
+
+
+class GeneratedOrderingActivity(BaseModel):
+    type: Literal["ordering"] = "ordering"
+    description: str | None = None
+    explanation: str | None = EXPLANATION_FIELD
+    basis: str = Field(
+        description="What decides the order, e.g. 'chronological', 'process "
+        "steps', 'smallest to largest'. The lesson must make it clear."
+    )
+    items: list[str] = Field(
+        min_length=3,
+        max_length=8,
+        description="The items in the one correct order. The learner sees "
+        "them shuffled.",
+    )
+
+
+class GeneratedCategorizeItem(BaseModel):
+    text: str
+    category: str = Field(description="Must be one of the activity's categories.")
+
+
+class GeneratedCategorizeActivity(BaseModel):
+    type: Literal["categorize"] = "categorize"
+    description: str | None = None
+    explanation: str | None = EXPLANATION_FIELD
+    categories: list[str] = Field(min_length=2, max_length=4)
+    items: list[GeneratedCategorizeItem] = Field(min_length=3, max_length=8)
+
+
+class GeneratedNumericActivity(BaseModel):
+    type: Literal["numeric"] = "numeric"
+    description: str | None = None
+    explanation: str | None = EXPLANATION_FIELD
+    question: str
+    answer: float = Field(description="The correct number.")
+    answer_expression: str = Field(
+        description="A Python expression that computes `answer` from the "
+        "numbers in the question, e.g. '(120 - 100) / 100 * 100'. The server "
+        "runs it to check your answer. Use only arithmetic and the math "
+        "module."
+    )
+    tolerance: float = Field(
+        default=0,
+        ge=0,
+        description="How far from `answer` still counts as correct. Use it "
+        "for rounded answers, e.g. 0.01.",
+    )
+    unit: str | None = Field(
+        default=None, description="The unit of the answer, e.g. 'percent'."
     )
 
 
 GeneratedActivity = Annotated[
     GeneratedMatchingActivity
     | GeneratedFillBlankActivity
-    | GeneratedMultipleChoiceActivity,
+    | GeneratedMultipleChoiceActivity
+    | GeneratedOrderingActivity
+    | GeneratedCategorizeActivity
+    | GeneratedNumericActivity,
     Field(discriminator="type"),
 ]
 
 
+class GeneratedSection(BaseModel):
+    title: str = Field(description="A short heading for this part of the lesson.")
+    markdown: str = Field(description="This part of the lesson, in markdown.")
+    activities: list[GeneratedActivity] = Field(
+        default_factory=list,
+        max_length=MAX_LESSON_ACTIVITIES,
+        description="Checks the learner does right after reading this "
+        "section. They test this section only. Can be empty. Keep mid-lesson "
+        "checks to 1 or 2; a final review section can hold more.",
+    )
+
+
 class LessonContent(BaseModel):
-    written_lesson_markdown: str = Field(
-        description="The full written lesson, in markdown."
+    sections: list[GeneratedSection] = Field(
+        min_length=1,
+        max_length=4,
+        description="The lesson, split into the parts a learner reads in order.",
     )
     code_practice: GeneratedFunctionPractice | None = Field(
         default=None,
         description="A runnable code exercise for this lesson, if the "
         "lesson calls for one.",
     )
-    interactive_activities: list[GeneratedActivity] = Field(
-        description="1 to 3 interactive check-for-understanding activities.",
-        max_length=3,
+
+    @property
+    def written_lesson_markdown(self) -> str:
+        """The whole lesson text, for checks that read the written words."""
+        return "\n\n".join(section.markdown for section in self.sections)
+
+    @property
+    def interactive_activities(self) -> list[GeneratedActivity]:
+        """Every activity in the lesson, in reading order."""
+        return [
+            activity for section in self.sections for activity in section.activities
+        ]
+
+    @model_validator(mode="after")
+    def _activity_budget(self) -> "LessonContent":
+        if len(self.interactive_activities) > MAX_LESSON_ACTIVITIES:
+            raise ValueError(
+                f"a lesson can have at most {MAX_LESSON_ACTIVITIES} activities"
+            )
+        return self
+
+
+class GeneratedSectionActivities(BaseModel):
+    """New activities for one section of an already-written lesson - the
+    output of the narrower retry that fixes only the activities instead
+    of rewriting the whole lesson. See lesson_activities_fix_prompt."""
+
+    section_index: int = Field(
+        description="The 0-based index of the section these activities "
+        "replace, matching the numbered sections in the prompt."
+    )
+    activities: list[GeneratedActivity] = Field(
+        default_factory=list, max_length=MAX_LESSON_ACTIVITIES
+    )
+
+
+class GeneratedLessonActivityFix(BaseModel):
+    sections: list[GeneratedSectionActivities] = Field(
+        description="One entry for each section whose activities need to "
+        "change. Do not include a section that needs no change."
     )
 
 
@@ -193,4 +409,53 @@ class EvaluationResult(BaseModel):
     feedback: str = Field(
         description="Specific and actionable. If passed, briefly say what's "
         "good. If not, say exactly what to fix."
+    )
+
+
+# --- Activity solver ---------------------------------------------------
+
+
+class SolvedActivity(BaseModel):
+    activity_number: int = Field(description="The number shown in the prompt.")
+    answer: str = Field(
+        description="The option text for multipleChoice, or the blank answers "
+        "in order separated by ' | ' for fillBlank."
+    )
+    other_defensible_answer: str = Field(
+        default="",
+        description="Another answer that is equally correct, in the same "
+        "format. Empty when the lesson forces one answer.",
+    )
+
+
+class ActivitySolutions(BaseModel):
+    activities: list[SolvedActivity]
+
+
+# --- Screening ---------------------------------------------------------
+
+
+RefusalCategory = Literal[
+    "none",
+    "operational_harm",
+    "individual_medical_advice",
+    "individual_legal_advice",
+    "individual_financial_advice",
+    "sexual_content",
+    "hate_or_harassment",
+]
+
+
+class ScreeningDecision(BaseModel):
+    allowed: bool = Field(
+        description="True when this app can teach the topic as a course."
+    )
+    category: RefusalCategory = Field(
+        default="none",
+        description="Why the topic is refused. 'none' when it is allowed.",
+    )
+    reason: str = Field(
+        default="",
+        description="One sentence for the learner, in plain words, saying "
+        "what cannot be generated. Empty when the topic is allowed.",
     )

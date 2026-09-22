@@ -11,6 +11,7 @@ import {
   Group,
   List,
   Modal,
+  SegmentedControl,
   Pagination,
   Progress,
   SimpleGrid,
@@ -48,6 +49,7 @@ import { useCourseProgress } from '../../hooks/useCourseProgress'
 import { useAuthSession } from '../../lib/auth'
 import { hasCompletedTour, useTour, type TourStep } from '../tour/TourContext'
 import UnsaveCourseModal from './UnsaveCourseModal'
+import type { CourseType } from '../../types/course'
 
 type DeleteStep = 'closed' | 'confirm' | 'download-prompt'
 
@@ -345,12 +347,14 @@ export function CourseCatalog({ scope }: { scope: 'mine' | 'explore' }) {
   const [searchInput, setSearchInput] = useState('')
   const [q, setQ] = useState('')
   const [tag, setTag] = useState<string | null>(null)
+  const [courseType, setCourseType] = useState<CourseType | 'all'>('all')
   const [page, setPage] = useState(1)
   const session = useAuthSession()
   const userId = session.data?.user.id
   const { courses, total, loading, refetch } = useCourses({
     q,
     tag: tag ?? undefined,
+    courseType: courseType === 'all' ? undefined : courseType,
     forUserId: scope === 'mine' ? userId : undefined,
     limit: PAGE_SIZE,
     offset: (page - 1) * PAGE_SIZE,
@@ -375,7 +379,7 @@ export function CourseCatalog({ scope }: { scope: 'mine' | 'explore' }) {
 
   useEffect(() => {
     setPage(1)
-  }, [q, tag, scope])
+  }, [q, tag, courseType, scope])
 
   return (
     <Container size="lg" py="xl">
@@ -425,6 +429,16 @@ export function CourseCatalog({ scope }: { scope: 'mine' | 'explore' }) {
             onChange={(e) => setSearchInput(e.currentTarget.value)}
             leftSection={<MagnifyingGlassIcon size={16} />}
             style={{ flex: 1 }}
+          />
+          <SegmentedControl
+            value={courseType}
+            onChange={(value) => setCourseType(value as CourseType | 'all')}
+            aria-label="Filter by course type"
+            data={[
+              { label: 'All', value: 'all' },
+              { label: 'Programming', value: 'programming' },
+              { label: 'Other subjects', value: 'general' },
+            ]}
           />
           {tag && (
             <Badge
