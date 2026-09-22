@@ -1,0 +1,65 @@
+{
+  "id": "a3f1c9e2-1b4d-4a6e-9c7f-8e2d5b6a4f10",
+  "title": "Try a few activities",
+  "activities": [
+    {
+      "type": "matching",
+      "id": "f4e2a8b1-6c3d-4e9f-8a1b-2c5d7e9f0a11",
+      "description": "Match the HTTP status code to the message",
+      "pairs": [
+        { "id": "1", "term": "200", "definition": "OK" },
+        { "id": "2", "term": "201", "definition": "Created" },
+        { "id": "3", "term": "204", "definition": "No Content" },
+        { "id": "4", "term": "400", "definition": "Bad Request" },
+        { "id": "5", "term": "401", "definition": "Unauthorized" },
+        { "id": "6", "term": "403", "definition": "Forbidden" },
+        { "id": "7", "term": "404", "definition": "Not Found" },
+        { "id": "8", "term": "500", "definition": "Internal Server Error" }
+      ]
+    },
+    {
+      "type": "fillBlank",
+      "id": "b8d1e4a7-3f2c-4b6d-9e8a-1c4f6a8b2d22",
+      "description": "Complete the JavaScript declaration.",
+      "text": "The keyword {{blank}} declares a variable that can't be reassigned.",
+      "blanks": [
+        {
+          "position": 0,
+          "accepted": ["const"]
+        }
+      ]
+    },
+    {
+      "type": "multipleChoice",
+      "id": "c9e2f5b8-4a3d-4c7e-8f9a-2d5b7c9e3f33",
+      "question": "Which data structure processes items first in, first out (FIFO)?",
+      "options": ["Stack", "Queue", "Array"],
+      "correctIndex": 1
+    },
+    {
+      "type": "ordering",
+      "id": "d1a3f6c9-5b4e-4d8f-9a1b-3e6c8d1a4f44",
+      "basis": "outside to inside",
+      "items": ["Margin", "Border", "Padding", "Content"]
+    },
+    {
+      "type": "categorize",
+      "id": "e2b4a7d1-6c5f-4e9a-8b2c-4f7d9e2b5a55",
+      "description": "Sort each tool by where it's typically used.",
+      "categories": ["Frontend", "Backend"],
+      "items": [
+        { "id": "1", "text": "React", "category": "Frontend" },
+        { "id": "2", "text": "Tailwind CSS", "category": "Frontend" },
+        { "id": "3", "text": "FastAPI", "category": "Backend" },
+        { "id": "4", "text": "PostgreSQL", "category": "Backend" }
+      ]
+    },
+    {
+      "type": "numeric",
+      "id": "f3c5b8e2-7d6a-4f1b-9c3d-5a8e1f3c6b66",
+      "question": "At most how many comparisons does a binary search need on 1,024 sorted items?",
+      "answer": 10,
+      "tolerance": 0
+    }
+  ]
+}
