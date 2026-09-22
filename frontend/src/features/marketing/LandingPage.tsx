@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import {
   Button,
   Container,
+  Divider,
   Group,
   Paper,
   SimpleGrid,
@@ -14,6 +15,9 @@ import {
   CodeIcon,
   ListChecksIcon,
 } from '@phosphor-icons/react'
+import landingDemo from '../../data/landing-demo.json'
+import type { InteractivePractice } from '../../types/interactivePractice'
+import InteractivePracticeView from '../lesson-viewer/InteractivePractiveView'
 
 const features = [
   {
@@ -35,6 +39,8 @@ const features = [
       'Lessons unlock in order, so you always know where you left off.',
   },
 ]
+
+const demoPractice = landingDemo as InteractivePractice
 
 export default function LandingPage() {
   return (
@@ -71,6 +77,10 @@ export default function LandingPage() {
             </Paper>
           ))}
         </SimpleGrid>
+        <Divider label="Try it out" />
+        <Stack gap="md">
+          <InteractivePracticeView view={demoPractice} />
+        </Stack>
       </Stack>
     </Container>
   )
